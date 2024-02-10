@@ -17,6 +17,10 @@ go gamma delta e = case Debug.trace (show e) e of
         t2 <- goType delta t
         body2 <- go (insert name (id, t2) gamma) delta body
         return $ Lambda id t2 body2
+    TLambdaSyntax name body -> do
+        id <- fresh
+        body2 <- go gamma (insert name id delta) body
+        return $ TLambda id body2
     AppSyntax e1 e2 -> do
         e1' <- go gamma delta e1
         e2' <- go gamma delta e2

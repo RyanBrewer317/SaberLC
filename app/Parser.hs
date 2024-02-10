@@ -72,6 +72,16 @@ parseLambda = do
     ws
     LambdaSyntax x t <$> parseExpr
 
+parseTLambda :: Parser ExprSyntax
+parseTLambda = do
+    _ <- string "/\\"
+    ws
+    x <- parseIdentifier
+    ws
+    _ <- char '.'
+    ws
+    TLambdaSyntax x <$> parseExpr
+
 parseVar :: Parser ExprSyntax
 parseVar = VarSyntax <$> parseIdentifier
 

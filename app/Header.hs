@@ -16,6 +16,7 @@ data TypeSyntax = I32Syntax
                 deriving (Show, Eq)
 
 data ExprSyntax = LambdaSyntax String TypeSyntax ExprSyntax
+                | TLambdaSyntax String ExprSyntax
                 | AppSyntax ExprSyntax ExprSyntax
                 | TAppSyntax ExprSyntax TypeSyntax
                 | VarSyntax String
@@ -31,14 +32,18 @@ data Type = I32
           deriving (Show, Eq)
 
 data Expr = Lambda Id Type Expr
+          | TLambda Id Expr
           | App Type Expr Expr
           | TApp Type Expr Type
           | Var Id Type
           | Lit Int
           deriving (Show, Eq)
 
+
+
 getType :: Expr -> Type
 getType (Lambda _ t e) = Arrow t (getType e)
+getType (TLambda x e) = Forall x (getType e)
 getType (App t _ _) = t
 getType (TApp t _ _) = t
 getType (Var _ t) = t
@@ -66,6 +71,7 @@ prettyType (Arrow t1 t2) = "(" ++ prettyType t1 ++ " -> " ++ prettyType t2 ++ ")
 
 prettyExpr :: Expr -> String
 prettyExpr (Lambda x t e) = "λx" ++ show x ++ ": " ++ prettyType t ++ ". " ++ prettyExpr e
+prettyExpr (TLambda x e) = "Λx" ++ show x ++ ". " ++ prettyExpr e
 prettyExpr (App _t e1 e2) = "(" ++ prettyExpr e1 ++ " " ++ prettyExpr e2 ++ ")"
 prettyExpr (TApp _t e t') = prettyExpr e ++ "[" ++ prettyType t' ++ "]"
 prettyExpr (Var x _t) = "x" ++ show x
