@@ -8,6 +8,7 @@
 
 module Header where
 import Prelude hiding (id)
+import Data.List (intercalate)
 
 data TypeSyntax = I32Syntax
                 | TVarSyntax String
@@ -39,7 +40,23 @@ data Expr = Lambda Id Type Expr
           | Lit Int
           deriving (Show, Eq)
 
+data TypeCPS = I32CPS
+             | TVarCPS Id
+             | ArrowCPS [Id] [TypeCPS]
+             | ProductCPS [TypeCPS]
+             deriving (Show, Eq)
 
+data ValCPS = LitCPS Int
+            | VarCPS Id TypeCPS
+            | LambdaCPS [Id] [(Id, TypeCPS)] ExprCPS
+            | TupleCPS [ValCPS]
+            deriving (Show, Eq)
+
+data ExprCPS = AppCPS ValCPS [TypeCPS] [ValCPS]
+             | HaltCPS ValCPS
+             | LetCPS Id TypeCPS ValCPS ExprCPS
+             | TupleProjCPS Id ValCPS Int ExprCPS
+             deriving (Show, Eq)
 
 getType :: Expr -> Type
 getType (Lambda _ t e) = Arrow t (getType e)
@@ -76,6 +93,33 @@ prettyExpr (App _t e1 e2) = "(" ++ prettyExpr e1 ++ " " ++ prettyExpr e2 ++ ")"
 prettyExpr (TApp _t e t') = prettyExpr e ++ "[" ++ prettyType t' ++ "]"
 prettyExpr (Var x _t) = "x" ++ show x
 prettyExpr (Lit x) = show x
+
+prettyCPSType :: TypeCPS -> String
+prettyCPSType I32CPS = "i32"
+prettyCPSType (TVarCPS x) = "x" ++ show x
+prettyCPSType (ArrowCPS xs ts) = if null xs then "(" ++ intercalate ", " (map prettyCPSType ts) ++ ")->0"
+                                 else "∀" ++ intercalate ", " (map (("x"++).show) xs) ++ ". (" ++ intercalate ", " (map prettyCPSType ts) ++ ")->0"
+prettyCPSType (ProductCPS ts) = "(" ++ intercalate "*" (map prettyCPSType ts) ++ ")"
+
+prettyCPSVal :: ValCPS -> String
+prettyCPSVal (LitCPS x) = show x
+prettyCPSVal (VarCPS x _t) = "x" ++ show x
+prettyCPSVal (LambdaCPS tvars xs e) = 
+   if null tvars then 
+      "(λ" ++ intercalate ", " (map (\(x,t)->"x"++show x++": "++prettyCPSType t) xs) ++ ". " ++ prettyCPSExpr e ++ ")"
+   else 
+      "(λ[" ++ intercalate ", " (map (("x"++).show) tvars) ++ "]" ++ intercalate ", " (map (\(x,t)->"x"++show x++": "++prettyCPSType t) xs) ++ ". " ++ prettyCPSExpr e ++ ")"
+prettyCPSVal (TupleCPS xs) = "(" ++ intercalate ", " (map prettyCPSVal xs) ++ ")"
+
+prettyCPSExpr :: ExprCPS -> String
+prettyCPSExpr (AppCPS e ts xs) = 
+   if null ts then
+      prettyCPSVal e ++ "(" ++ intercalate ", " (map prettyCPSVal xs) ++ ")"
+   else
+      prettyCPSVal e ++ "[" ++ intercalate ", " (map prettyCPSType ts) ++ "](" ++ intercalate ", " (map prettyCPSVal xs) ++ ")"
+prettyCPSExpr (HaltCPS e) = "halt(" ++ prettyCPSVal e ++ ")"
+prettyCPSExpr (LetCPS x t e1 e2) = "let x" ++ show x ++ ": " ++ prettyCPSType t ++ " = " ++ prettyCPSVal e1 ++ " in " ++ prettyCPSExpr e2
+prettyCPSExpr (TupleProjCPS x tpl i cont) = "let x" ++ show x ++ " = proj(" ++ show i ++ ", " ++ prettyCPSVal tpl ++ ") in " ++ prettyCPSExpr cont
 
 data Error = ParseError String
            | UnknownIdentifier String
