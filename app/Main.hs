@@ -6,7 +6,16 @@
 
 
 module Main where
-import Parser
+import qualified Parser
+import qualified AST
+import Header
+import Control.Monad ((>=>))
+import Data.Map
 
 main :: IO ()
-main = print (go " \\ x : i32 -> i32 . ( x ( 6 ) ) ")
+main = case run 0 $ go " \\ id : forall a. a->a . id[forall b. b->b](id)[i32](id[i32](4)) " of
+   Left err -> print err
+   Right e -> putStrLn $ prettyExpr e
+
+go :: String -> SLC Expr
+go = Parser.go >=> AST.go empty empty

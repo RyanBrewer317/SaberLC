@@ -65,13 +65,13 @@ executable saberlc
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
-    other-modules:    Parser, Header
+    other-modules:    Parser, Header, AST
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.17.2.1, parsec ^>= 3.1.16.1
+    build-depends:    base ^>=4.17.2.1, parsec ^>= 3.1.16.1, containers ^>= 0.6.7
 
     -- Directories containing source files.
     hs-source-dirs:   app

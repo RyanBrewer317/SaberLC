@@ -7,11 +7,15 @@
 module Parser where
 import Text.Parsec.String
 import Header
-import Text.Parsec (string, many, lower, alphaNum, (<|>), char, many1, optionMaybe, digit, ParseError, parse)
+import Text.Parsec (string, many, lower, alphaNum, (<|>), char, many1, optionMaybe, digit, parse)
 import Control.Monad (void)
+import Prelude hiding (fail)
+import Data.Foldable (foldl')
 
-go :: String -> Either ParseError ExprSyntax
-go = parse parseExpr "INPUT"
+go :: String -> SLC ExprSyntax
+go s = case parse parseExpr "INPUT" s of
+    Left err -> fail $ ParseError $ show err
+    Right x -> return x
 
 parseI32 :: Parser TypeSyntax
 parseI32 = do
@@ -77,14 +81,18 @@ parseLit = LitSyntax . read <$> many1 digit
 parenthetical :: Parser a -> Parser a
 parenthetical p = char '(' *> ws *> p <* ws <* char ')'
 
+bracketed :: Parser a -> Parser a
+bracketed p = char '[' *> ws *> p <* ws <* char ']'
+
 parseExpr :: Parser ExprSyntax
 parseExpr = do
     ws
     e <- parseLambda <|> parenthetical parseExpr <|> parseVar <|> parseLit
     ws
-    mb_app <- optionMaybe $ parenthetical parseExpr
-    let e2 = (case mb_app of
-            Just arg -> AppSyntax e arg
-            Nothing -> e)
+    es <- many $ (Left <$> (ws *> parenthetical parseExpr <* ws)) <|> (Right <$> (ws *> bracketed parseType <* ws))
+    let e2 = foldl' f e es
     ws
     return e2
+    where
+        f e (Left e2) = AppSyntax e e2
+        f e (Right t) = TAppSyntax e t
