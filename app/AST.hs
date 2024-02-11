@@ -8,10 +8,9 @@ module AST where
 import Header
 import Data.Map
 import Prelude hiding (id, lookup, fail)
-import qualified Debug.Trace as Debug
 
 go :: Map String (Id, Type) -> Map String Id -> ExprSyntax -> SLC Expr
-go gamma delta e = case Debug.trace (show e) e of
+go gamma delta e = case e of
     LambdaSyntax name t body -> do
         id <- fresh
         t2 <- goType delta t

@@ -7,14 +7,15 @@
 module CPS where
 import Header
 import Prelude hiding (id)
+import Data.Void (Void)
 
-go :: Expr -> SLC ExprCPS
+go :: Expr -> SLC (ExprCPS Void)
 go e = do
     x <- fresh
     let t = goType $ getType e
     goExpr e (LambdaCPS [] [(x, t)] $ HaltCPS $ VarCPS x t)
 
-goExpr :: Expr -> ValCPS -> SLC ExprCPS
+goExpr :: Expr -> ValCPS Void -> SLC (ExprCPS Void)
 goExpr e k = case e of
     Var x t -> return $ AppCPS k [] [VarCPS x $ goType t]
     Lit i -> return $ AppCPS k [] [LitCPS i]
@@ -39,7 +40,7 @@ goExpr e k = case e of
         let xt = goType $ getType e1
         goExpr e1 $ LambdaCPS [] [(x, xt)] $ AppCPS (VarCPS x xt) [goType targ] [k]
 
-goType :: Type -> TypeCPS
+goType :: Type -> TypeCPS Void
 goType t = case t of
     I32 -> I32CPS
     TVar id -> TVarCPS id

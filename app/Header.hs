@@ -3,7 +3,6 @@
    License, v. 2.0. If a copy of the MPL was not distributed with this
    file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE InstanceSigs #-}
 
 module Header where
@@ -40,23 +39,27 @@ data Expr = Lambda Id Type Expr
           | Lit Int
           deriving (Show, Eq)
 
-data TypeCPS = I32CPS
-             | TVarCPS Id
-             | ArrowCPS [Id] [TypeCPS]
-             | ProductCPS [TypeCPS]
-             deriving (Show, Eq)
+data TypeCPS clos = I32CPS
+                  | TVarCPS Id
+                  | ArrowCPS [Id] [TypeCPS clos]
+                  | ProductCPS [TypeCPS clos]
+                  | ExistsCPS Id (TypeCPS clos) clos
+                  deriving (Show, Eq)
 
-data ValCPS = LitCPS Int
-            | VarCPS Id TypeCPS
-            | LambdaCPS [Id] [(Id, TypeCPS)] ExprCPS
-            | TupleCPS [ValCPS]
-            deriving (Show, Eq)
+data ValCPS clos = LitCPS Int
+                 | VarCPS Id (TypeCPS clos)
+                 | LambdaCPS [Id] [(Id, TypeCPS clos)] (ExprCPS clos)
+                 | TupleCPS [ValCPS clos]
+                 | TAppCPS (TypeCPS clos) (ValCPS clos) [TypeCPS clos] clos
+                 | PackCPS (TypeCPS clos) (ValCPS clos) (TypeCPS clos) clos
+                 deriving (Show, Eq)
 
-data ExprCPS = AppCPS ValCPS [TypeCPS] [ValCPS]
-             | HaltCPS ValCPS
-             | LetCPS Id TypeCPS ValCPS ExprCPS
-             | TupleProjCPS Id ValCPS Int ExprCPS
-             deriving (Show, Eq)
+data ExprCPS clos = AppCPS (ValCPS clos) [TypeCPS clos] [ValCPS clos]
+                  | HaltCPS (ValCPS clos)
+                  | LetCPS Id (TypeCPS clos) (ValCPS clos) (ExprCPS clos)
+                  | TupleProjCPS Id (ValCPS clos) Int (ExprCPS clos)
+                  | UnpackCPS Id Id (ValCPS clos) (ExprCPS clos) clos
+                  deriving (Show, Eq)
 
 getType :: Expr -> Type
 getType (Lambda _ t e) = Arrow t (getType e)
@@ -65,6 +68,21 @@ getType (App t _ _) = t
 getType (TApp t _ _) = t
 getType (Var _ t) = t
 getType (Lit _) = I32
+
+getTypeCPS :: ExprCPS clos -> TypeCPS clos
+getTypeCPS (AppCPS {}) = undefined
+getTypeCPS (HaltCPS v) = getValCPSType v
+getTypeCPS (LetCPS _ _ _ e) = getTypeCPS e
+getTypeCPS (TupleProjCPS _ _ _ e) = getTypeCPS e
+getTypeCPS (UnpackCPS _ _ _ e _) = getTypeCPS e
+
+getValCPSType :: ValCPS clos -> TypeCPS clos
+getValCPSType (LitCPS _) = I32CPS
+getValCPSType (VarCPS _ t) = t
+getValCPSType (LambdaCPS tvars ts _) = ArrowCPS tvars (map snd ts)
+getValCPSType (TupleCPS vs) = ProductCPS (map getValCPSType vs)
+getValCPSType (TAppCPS t _ _ _) = t
+getValCPSType (PackCPS _ _ t _) = t
 
 substitute :: Id -> Type -> Type -> Type
 substitute x new t = case t of
@@ -94,25 +112,28 @@ prettyExpr (TApp _t e t') = prettyExpr e ++ "[" ++ prettyType t' ++ "]"
 prettyExpr (Var x _t) = "x" ++ show x
 prettyExpr (Lit x) = show x
 
-prettyCPSType :: TypeCPS -> String
+prettyCPSType :: TypeCPS clos -> String
 prettyCPSType I32CPS = "i32"
 prettyCPSType (TVarCPS x) = "x" ++ show x
 prettyCPSType (ArrowCPS xs ts) = if null xs then "(" ++ intercalate ", " (map prettyCPSType ts) ++ ")->0"
                                  else "∀" ++ intercalate ", " (map (("x"++).show) xs) ++ ". (" ++ intercalate ", " (map prettyCPSType ts) ++ ")->0"
-prettyCPSType (ProductCPS ts) = "(" ++ intercalate "*" (map prettyCPSType ts) ++ ")"
+prettyCPSType (ProductCPS ts) = intercalate "*" (map (("("++).(++")").prettyCPSType) ts)
+prettyCPSType (ExistsCPS x t _) = "∃x" ++ show x ++ ". " ++ prettyCPSType t
 
-prettyCPSVal :: ValCPS -> String
+prettyCPSVal :: ValCPS clos -> String
 prettyCPSVal (LitCPS x) = show x
 prettyCPSVal (VarCPS x _t) = "x" ++ show x
-prettyCPSVal (LambdaCPS tvars xs e) = 
-   if null tvars then 
+prettyCPSVal (LambdaCPS tvars xs e) =
+   if null tvars then
       "(λ" ++ intercalate ", " (map (\(x,t)->"x"++show x++": "++prettyCPSType t) xs) ++ ". " ++ prettyCPSExpr e ++ ")"
-   else 
+   else
       "(λ[" ++ intercalate ", " (map (("x"++).show) tvars) ++ "]" ++ intercalate ", " (map (\(x,t)->"x"++show x++": "++prettyCPSType t) xs) ++ ". " ++ prettyCPSExpr e ++ ")"
 prettyCPSVal (TupleCPS xs) = "(" ++ intercalate ", " (map prettyCPSVal xs) ++ ")"
+prettyCPSVal (TAppCPS _ e ts _) = prettyCPSVal e ++ "[" ++ intercalate ", " (map prettyCPSType ts) ++ "]"
+prettyCPSVal (PackCPS t v t' _) = "pack[" ++ prettyCPSType t ++ ", " ++ prettyCPSVal v ++ "] as " ++ prettyCPSType t'
 
-prettyCPSExpr :: ExprCPS -> String
-prettyCPSExpr (AppCPS e ts xs) = 
+prettyCPSExpr :: ExprCPS clos -> String
+prettyCPSExpr (AppCPS e ts xs) =
    if null ts then
       prettyCPSVal e ++ "(" ++ intercalate ", " (map prettyCPSVal xs) ++ ")"
    else
@@ -120,6 +141,7 @@ prettyCPSExpr (AppCPS e ts xs) =
 prettyCPSExpr (HaltCPS e) = "halt(" ++ prettyCPSVal e ++ ")"
 prettyCPSExpr (LetCPS x t e1 e2) = "let x" ++ show x ++ ": " ++ prettyCPSType t ++ " = " ++ prettyCPSVal e1 ++ " in " ++ prettyCPSExpr e2
 prettyCPSExpr (TupleProjCPS x tpl i cont) = "let x" ++ show x ++ " = proj(" ++ show i ++ ", " ++ prettyCPSVal tpl ++ ") in " ++ prettyCPSExpr cont
+prettyCPSExpr (UnpackCPS x y v cont _) = "let [x" ++ show x ++ ", x" ++ show y ++ "] = unpack(" ++ prettyCPSVal v ++ ") in " ++ prettyCPSExpr cont
 
 data Error = ParseError String
            | UnknownIdentifier String
@@ -134,7 +156,7 @@ newtype SLC a = SLC { runSLC :: Id -> SLC_ a}
 
 instance Functor SLC where
    fmap :: (a -> b) -> SLC a -> SLC b
-   fmap f (SLC g) = SLC $ \id -> 
+   fmap f (SLC g) = SLC $ \id ->
       case g id of
          Fine id2 x -> Fine id2 (f x)
          Fail e -> Fail e
@@ -143,7 +165,7 @@ instance Applicative SLC where
    pure :: a -> SLC a
    pure x = SLC $ flip Fine x
    (<*>) :: SLC (a -> b) -> SLC a -> SLC b
-   (<*>) (SLC f) (SLC g) = SLC $ \id -> 
+   (<*>) (SLC f) (SLC g) = SLC $ \id ->
       case f id of
          Fine id2 h -> case g id2 of
             Fine id3 x -> Fine id3 (h x)
@@ -152,7 +174,7 @@ instance Applicative SLC where
 
 instance Monad SLC where
    (>>=) :: SLC a -> (a -> SLC b) -> SLC b
-   (>>=) (SLC f) g = SLC $ \id -> 
+   (>>=) (SLC f) g = SLC $ \id ->
          case f id of
             Fine id2 x -> runSLC (g x) id2
             Fail e -> Fail e

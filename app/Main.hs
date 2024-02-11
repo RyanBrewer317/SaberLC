@@ -9,6 +9,7 @@ module Main where
 import qualified Parser
 import qualified AST
 import qualified CPS
+import qualified ClosureConv
 import Header
 import Control.Monad ((>=>))
 import Data.Map
@@ -18,5 +19,5 @@ main = case run 0 $ go "(\\x: i32. x)(3)" of
    Left err -> print err
    Right e -> putStrLn $ prettyCPSExpr e
 
-go :: String -> SLC ExprCPS
-go = Parser.go >=> AST.go empty empty >=> CPS.go
+go :: String -> SLC (ExprCPS ())
+go = Parser.go >=> AST.go empty empty >=> CPS.go >=> ClosureConv.go
