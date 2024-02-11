@@ -23,8 +23,8 @@ go e = case e of
       as2 <- mapM goVal as
       ts2 <- mapM goType ts
       return $ flip (UnpackCPS gamma z f2) () $
-            TupleProjCPS zcode (VarCPS z prodt) 1 $
-               TupleProjCPS zenv (VarCPS z prodt) 2 $
+            TupleProjCPS zcode (VarCPS z prodt) 0 $
+               TupleProjCPS zenv (VarCPS z prodt) 1 $
                   AppCPS (VarCPS zcode tcode) ts2 (VarCPS zenv (TVarCPS gamma) : as2)
    HaltCPS v -> HaltCPS <$> goVal v
    LetCPS id t v scope -> LetCPS id <$> goType t <*> goVal v <*> go scope

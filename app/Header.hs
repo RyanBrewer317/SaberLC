@@ -117,7 +117,7 @@ prettyCPSType I32CPS = "i32"
 prettyCPSType (TVarCPS x) = "x" ++ show x
 prettyCPSType (ArrowCPS xs ts) = if null xs then "(" ++ intercalate ", " (map prettyCPSType ts) ++ ")->0"
                                  else "∀" ++ intercalate ", " (map (("x"++).show) xs) ++ ". (" ++ intercalate ", " (map prettyCPSType ts) ++ ")->0"
-prettyCPSType (ProductCPS ts) = intercalate "*" (map (("("++).(++")").prettyCPSType) ts)
+prettyCPSType (ProductCPS ts) = if null ts then "()" else intercalate "*" (map (("("++).(++")").prettyCPSType) ts)
 prettyCPSType (ExistsCPS x t _) = "∃x" ++ show x ++ ". " ++ prettyCPSType t
 
 prettyCPSVal :: ValCPS clos -> String
@@ -139,9 +139,14 @@ prettyCPSExpr (AppCPS e ts xs) =
    else
       prettyCPSVal e ++ "[" ++ intercalate ", " (map prettyCPSType ts) ++ "](" ++ intercalate ", " (map prettyCPSVal xs) ++ ")"
 prettyCPSExpr (HaltCPS e) = "halt(" ++ prettyCPSVal e ++ ")"
-prettyCPSExpr (LetCPS x t e1 e2) = "let x" ++ show x ++ ": " ++ prettyCPSType t ++ " = " ++ prettyCPSVal e1 ++ " in " ++ prettyCPSExpr e2
-prettyCPSExpr (TupleProjCPS x tpl i cont) = "let x" ++ show x ++ " = proj(" ++ show i ++ ", " ++ prettyCPSVal tpl ++ ") in " ++ prettyCPSExpr cont
-prettyCPSExpr (UnpackCPS x y v cont _) = "let [x" ++ show x ++ ", x" ++ show y ++ "] = unpack(" ++ prettyCPSVal v ++ ") in " ++ prettyCPSExpr cont
+prettyCPSExpr (LetCPS x t e1 e2) = "let x" ++ show x ++ ": " ++ prettyCPSType t ++ " = " ++ prettyCPSVal e1 ++ " in\n    " ++ prettyCPSExpr e2
+prettyCPSExpr (TupleProjCPS x tpl i cont) = "let x" ++ show x ++ " = proj(" ++ show i ++ ", " ++ prettyCPSVal tpl ++ ") in\n    " ++ prettyCPSExpr cont
+prettyCPSExpr (UnpackCPS x y v cont _) = "let [x" ++ show x ++ ", x" ++ show y ++ "] = unpack(" ++ prettyCPSVal v ++ ") in\n    " ++ prettyCPSExpr cont
+
+data Stmt = Func Id [Id] [(Id, TypeCPS ())] (ExprCPS ()) deriving (Show, Eq)
+
+prettyStmt :: Stmt -> String
+prettyStmt (Func x tvars params e) = "fn x" ++ show x ++ "["++intercalate ", " (map show tvars) ++ "](" ++ intercalate ", " (map (\(param,t)->"x"++show param++": "++prettyCPSType t) params) ++ ") {\n    " ++ prettyCPSExpr e ++ "\n}\n\n"
 
 data Error = ParseError String
            | UnknownIdentifier String
