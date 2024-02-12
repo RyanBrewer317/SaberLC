@@ -11,6 +11,7 @@ import qualified AST
 import qualified CPS
 import qualified ClosureConv
 import qualified Hoist
+import qualified Alloc
 import Header
 import Control.Monad ((>=>))
 import Data.Map
@@ -20,5 +21,5 @@ main = case run 0 $ go "(\\x: i32. x)(3)" of
    Left err -> print err
    Right stmts -> putStrLn $ concatMap prettyStmt stmts
 
-go :: String -> SLC [Stmt]
-go = Parser.go >=> AST.go empty empty >=> CPS.go >=> ClosureConv.go >=> Hoist.go
+go :: String -> SLC [Stmt U]
+go = Parser.go >=> AST.go empty empty >=> CPS.go >=> ClosureConv.go >=> Hoist.go >=> Alloc.go
