@@ -46,28 +46,28 @@ data Expr = Lambda Id Type Expr
           deriving (Show, Eq)
 
 data TypeCPS clos hoist alloc = I32CPS
-                  | TVarCPS Id
-                  | ArrowCPS [Id] [TypeCPS clos hoist alloc]
-                  | ProductCPS [(Alloc alloc, TypeCPS clos hoist alloc)]
-                  | ExistsCPS clos Id (TypeCPS clos hoist alloc)
-                  deriving (Show, Eq)
+                              | TVarCPS Id
+                              | ArrowCPS [Id] [TypeCPS clos hoist alloc]
+                              | ProductCPS [(Alloc alloc, TypeCPS clos hoist alloc)]
+                              | ExistsCPS clos Id (TypeCPS clos hoist alloc)
+                              deriving (Show, Eq)
 
 data ValCPS clos hoist alloc = LitCPS Int
-                 | VarCPS Id (TypeCPS clos hoist alloc)
-                 | LambdaCPS (Not hoist) [Id] [(Id, TypeCPS clos hoist alloc)] (ExprCPS clos hoist alloc)
-                 | TupleCPS (Not alloc) [(Alloc alloc, ValCPS clos hoist alloc)]
-                 | TAppCPS clos (TypeCPS clos hoist alloc) (ValCPS clos hoist alloc) [TypeCPS clos hoist alloc]
-                 | PackCPS clos (TypeCPS clos hoist alloc) (ValCPS clos hoist alloc) (TypeCPS clos hoist alloc)
-                 deriving (Show, Eq)
+                             | VarCPS Id (TypeCPS clos hoist alloc)
+                             | LambdaCPS (Not hoist) [Id] [(Id, TypeCPS clos hoist alloc)] (ExprCPS clos hoist alloc)
+                             | TupleCPS (Not alloc) [(Alloc alloc, ValCPS clos hoist alloc)]
+                             | TAppCPS clos (TypeCPS clos hoist alloc) (ValCPS clos hoist alloc) [TypeCPS clos hoist alloc]
+                             | PackCPS clos (TypeCPS clos hoist alloc) (ValCPS clos hoist alloc) (TypeCPS clos hoist alloc)
+                             deriving (Show, Eq)
 
 data ExprCPS clos hoist alloc = AppCPS (ValCPS clos hoist alloc) [TypeCPS clos hoist alloc] [ValCPS clos hoist alloc]
-                  | HaltCPS (ValCPS clos hoist alloc)
-                  | LetCPS Id (TypeCPS clos hoist alloc) (ValCPS clos hoist alloc) (ExprCPS clos hoist alloc)
-                  | TupleProjCPS Id (ValCPS clos hoist alloc) Int (ExprCPS clos hoist alloc)
-                  | UnpackCPS clos Id Id (ValCPS clos hoist alloc) (ExprCPS clos hoist alloc)
-                  | MallocCPS alloc Id [TypeCPS clos hoist alloc] (ExprCPS clos hoist alloc)
-                  | InitCPS alloc Id (ValCPS clos hoist alloc) Int (ValCPS clos hoist alloc) (ExprCPS clos hoist alloc)
-                  deriving (Show, Eq)
+                              | HaltCPS (ValCPS clos hoist alloc)
+                              | LetCPS Id (TypeCPS clos hoist alloc) (ValCPS clos hoist alloc) (ExprCPS clos hoist alloc)
+                              | TupleProjCPS Id (ValCPS clos hoist alloc) Int (ExprCPS clos hoist alloc)
+                              | UnpackCPS clos Id Id (ValCPS clos hoist alloc) (ExprCPS clos hoist alloc)
+                              | MallocCPS alloc Id [TypeCPS clos hoist alloc] (ExprCPS clos hoist alloc)
+                              | InitCPS alloc Id (ValCPS clos hoist alloc) Int (ValCPS clos hoist alloc) (ExprCPS clos hoist alloc)
+                              deriving (Show, Eq)
 
 data Alloc alloc where
    Initialized :: Alloc U
