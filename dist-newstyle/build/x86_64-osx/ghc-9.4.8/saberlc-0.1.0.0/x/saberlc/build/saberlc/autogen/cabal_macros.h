@@ -20,6 +20,26 @@
   (major1) == 4 && (major2) <  17 || \
   (major1) == 4 && (major2) == 17 && (minor) <= 2)
 #endif /* MIN_VERSION_base */
+/* package binary-0.8.9.1 */
+#ifndef VERSION_binary
+#define VERSION_binary "0.8.9.1"
+#endif /* VERSION_binary */
+#ifndef MIN_VERSION_binary
+#define MIN_VERSION_binary(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  8 || \
+  (major1) == 0 && (major2) == 8 && (minor) <= 9)
+#endif /* MIN_VERSION_binary */
+/* package bytestring-0.11.5.3 */
+#ifndef VERSION_bytestring
+#define VERSION_bytestring "0.11.5.3"
+#endif /* VERSION_bytestring */
+#ifndef MIN_VERSION_bytestring
+#define MIN_VERSION_bytestring(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  11 || \
+  (major1) == 0 && (major2) == 11 && (minor) <= 5)
+#endif /* MIN_VERSION_bytestring */
 /* package containers-0.6.7 */
 #ifndef VERSION_containers
 #define VERSION_containers "0.6.7"
@@ -41,15 +61,15 @@
   (major1) == 3 && (major2) == 1 && (minor) <= 16)
 #endif /* MIN_VERSION_parsec */
 
-/* tool gcc-15.0.0 */
+/* tool gcc-14.0.3 */
 #ifndef TOOL_VERSION_gcc
-#define TOOL_VERSION_gcc "15.0.0"
+#define TOOL_VERSION_gcc "14.0.3"
 #endif /* TOOL_VERSION_gcc */
 #ifndef MIN_TOOL_VERSION_gcc
 #define MIN_TOOL_VERSION_gcc(major1,major2,minor) (\
-  (major1) <  15 || \
-  (major1) == 15 && (major2) <  0 || \
-  (major1) == 15 && (major2) == 0 && (minor) <= 0)
+  (major1) <  14 || \
+  (major1) == 14 && (major2) <  0 || \
+  (major1) == 14 && (major2) == 0 && (minor) <= 3)
 #endif /* MIN_TOOL_VERSION_gcc */
 /* tool ghc-9.4.8 */
 #ifndef TOOL_VERSION_ghc

@@ -36,11 +36,11 @@ goExpr e = case e of
 goVal :: ValCPS U V V -> SLC (ValCPS U U V, [Stmt V])
 goVal v = case v of
     LitCPS i -> return (LitCPS i, [])
-    VarCPS x t -> return (VarCPS x (goType t), [])
+    VarCPS x t global -> return (VarCPS x (goType t) global, [])
     f@(LambdaCPS _ tvars xs e) -> do
         x <- fresh
         (e2, stmts) <- goExpr e
-        return (VarCPS x (goType $ getValCPSType f), Func x tvars (map (second goType) xs) e2 : stmts)
+        return (VarCPS x (goType $ getValCPSType f) True, Func x tvars (map (second goType) xs) e2 : stmts)
     TupleCPS n xs -> bimap (TupleCPS n) concat <$> mapAndUnzipM (\(PreAlloc,x)->goVal x >>= \(x2,stmts)->return((PreAlloc,x2),stmts)) xs
     TAppCPS () t e ts -> goVal e >>= \(e2,stmts)-> return (TAppCPS () (goType t) e2 (map goType ts), stmts)
     PackCPS () t v2 t2 -> goVal v2 >>= \(v3,stmts)-> return (PackCPS () (goType t) v3 (goType t2), stmts)

@@ -46,12 +46,12 @@ getBinDir, getLibDir, getDynLibDir, getDataDir, getLibexecDir, getSysconfDir :: 
 
 
 bindir, libdir, dynlibdir, datadir, libexecdir, sysconfdir :: FilePath
-bindir     = "/Users/ryanbrewer/.cabal/bin"
-libdir     = "/Users/ryanbrewer/.cabal/lib/x86_64-osx-ghc-9.4.8/saberlc-0.1.0.0-inplace-saberlc"
-dynlibdir  = "/Users/ryanbrewer/.cabal/lib/x86_64-osx-ghc-9.4.8"
-datadir    = "/Users/ryanbrewer/.cabal/share/x86_64-osx-ghc-9.4.8/saberlc-0.1.0.0"
-libexecdir = "/Users/ryanbrewer/.cabal/libexec/x86_64-osx-ghc-9.4.8/saberlc-0.1.0.0"
-sysconfdir = "/Users/ryanbrewer/.cabal/etc"
+bindir     = "/Users/okkochen/.cabal/bin"
+libdir     = "/Users/okkochen/.cabal/lib/x86_64-osx-ghc-9.4.8/saberlc-0.1.0.0-inplace-saberlc"
+dynlibdir  = "/Users/okkochen/.cabal/lib/x86_64-osx-ghc-9.4.8"
+datadir    = "/Users/okkochen/.cabal/share/x86_64-osx-ghc-9.4.8/saberlc-0.1.0.0"
+libexecdir = "/Users/okkochen/.cabal/libexec/x86_64-osx-ghc-9.4.8/saberlc-0.1.0.0"
+sysconfdir = "/Users/okkochen/.cabal/etc"
 
 getBinDir     = catchIO (getEnv "saberlc_bindir")     (\_ -> return bindir)
 getLibDir     = catchIO (getEnv "saberlc_libdir")     (\_ -> return libdir)

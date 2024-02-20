@@ -56,13 +56,13 @@ putDecls decls e = foldr (\d e2 ->
 goVal :: ValCPS U U V -> SLC (ValCPS U U U, [Decl])
 goVal v = case v of
     LitCPS lit -> return (LitCPS lit, [])
-    VarCPS x t -> return (VarCPS x (goType t), [])
+    VarCPS x t global -> return (VarCPS x (goType t) global, [])
     LambdaCPS (NotTrue void) _ _ _ -> absurd void
     TupleCPS NotFalse vs -> do
         (vs2, decls) <- mapAndUnzipM (goVal.snd) vs
         x <- fresh
         let xt = goType $ getValCPSType v
-        let first_var = VarCPS x xt
+        let first_var = VarCPS x xt False
         (end, decls2) <- getDecls vs2 0 first_var
         return (end, concat decls++Malloc x (map getValCPSType vs2):decls2)
     TAppCPS () t v2 ts -> do
@@ -78,7 +78,7 @@ getDecls (v:vs) i last_var = do
     x <- fresh
     let xt = getValCPSType v
     let decl = Init x last_var i v
-    (end, rest) <- getDecls vs (i+1) (VarCPS x xt)
+    (end, rest) <- getDecls vs (i+1) (VarCPS x xt False)
     return (end, decl:rest)
 
 goType :: TypeCPS U U V -> TypeCPS U U U

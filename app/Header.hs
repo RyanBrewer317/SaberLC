@@ -41,7 +41,7 @@ data Expr = Lambda Id Type Expr
           | TLambda Id Expr
           | App Type Expr Expr
           | TApp Type Expr Type
-          | Var Id Type
+          | Var Id Type Bool
           | Lit Int
           deriving (Show, Eq)
 
@@ -53,7 +53,7 @@ data TypeCPS clos hoist alloc = I32CPS
                               deriving (Show, Eq)
 
 data ValCPS clos hoist alloc = LitCPS Int
-                             | VarCPS Id (TypeCPS clos hoist alloc)
+                             | VarCPS Id (TypeCPS clos hoist alloc) Bool
                              | LambdaCPS (Not hoist) [Id] [(Id, TypeCPS clos hoist alloc)] (ExprCPS clos hoist alloc)
                              | TupleCPS (Not alloc) [(Alloc alloc, ValCPS clos hoist alloc)]
                              | TAppCPS clos (TypeCPS clos hoist alloc) (ValCPS clos hoist alloc) [TypeCPS clos hoist alloc]
@@ -101,7 +101,7 @@ getType (Lambda _ t e) = Arrow t (getType e)
 getType (TLambda x e) = Forall x (getType e)
 getType (App t _ _) = t
 getType (TApp t _ _) = t
-getType (Var _ t) = t
+getType (Var _ t _) = t
 getType (Lit _) = I32
 
 getTypeCPS :: ExprCPS clos hoist alloc -> TypeCPS clos hoist alloc
@@ -115,7 +115,7 @@ getTypeCPS (InitCPS _ _ _ _ _ e) = getTypeCPS e
 
 getValCPSType :: ValCPS clos hoist alloc -> TypeCPS clos hoist alloc
 getValCPSType (LitCPS _) = I32CPS
-getValCPSType (VarCPS _ t) = t
+getValCPSType (VarCPS _ t _) = t
 getValCPSType (LambdaCPS _ tvars ts _) = ArrowCPS tvars (map snd ts)
 getValCPSType (TupleCPS _ vs) = ProductCPS (map (second getValCPSType) vs)
 getValCPSType (TAppCPS _ t _ _) = t
@@ -146,7 +146,7 @@ prettyExpr (Lambda x t e) = "λx" ++ show x ++ ": " ++ prettyType t ++ ". " ++ p
 prettyExpr (TLambda x e) = "Λx" ++ show x ++ ". " ++ prettyExpr e
 prettyExpr (App _t e1 e2) = "(" ++ prettyExpr e1 ++ " " ++ prettyExpr e2 ++ ")"
 prettyExpr (TApp _t e t') = prettyExpr e ++ "[" ++ prettyType t' ++ "]"
-prettyExpr (Var x _t) = "x" ++ show x
+prettyExpr (Var x _t _global) = "x" ++ show x
 prettyExpr (Lit x) = show x
 
 prettyCPSType :: TypeCPS clos hoist alloc -> String
@@ -159,7 +159,7 @@ prettyCPSType (ExistsCPS _ x t) = "∃x" ++ show x ++ ". " ++ prettyCPSType t
 
 prettyCPSVal :: ValCPS clos hoist alloc -> String
 prettyCPSVal (LitCPS x) = show x
-prettyCPSVal (VarCPS x _t) = "x" ++ show x
+prettyCPSVal (VarCPS x _t _global) = "x" ++ show x
 prettyCPSVal (LambdaCPS _ tvars xs e) =
    if null tvars then
       "(λ" ++ intercalate ", " (map (\(x,t)->"x"++show x++": "++prettyCPSType t) xs) ++ ". " ++ prettyCPSExpr e ++ ")"

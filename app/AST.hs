@@ -9,12 +9,12 @@ import Header
 import Data.Map
 import Prelude hiding (id, lookup, fail)
 
-go :: Map String (Id, Type) -> Map String Id -> ExprSyntax -> SLC Expr
+go :: Map String (Id, Type, Bool) -> Map String Id -> ExprSyntax -> SLC Expr
 go gamma delta e = case e of
     LambdaSyntax name t body -> do
         id <- fresh
         t2 <- goType delta t
-        body2 <- go (insert name (id, t2) gamma) delta body
+        body2 <- go (insert name (id, t2, False) gamma) delta body
         return $ Lambda id t2 body2
     TLambdaSyntax name body -> do
         id <- fresh
@@ -38,7 +38,7 @@ go gamma delta e = case e of
             _ -> fail $ CallingNonForall (getType f2)
     VarSyntax name -> do
         case lookup name gamma of
-            Just (id, t) -> return $ Var id t
+            Just (id, t, global) -> return $ Var id t global
             Nothing -> fail $ UnknownIdentifier name
     LitSyntax lit -> return $ Lit lit
 
