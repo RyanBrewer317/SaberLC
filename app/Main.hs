@@ -12,6 +12,7 @@ import qualified CPS
 import qualified ClosureConv
 import qualified Hoist
 import qualified Alloc
+import qualified Regions
 import qualified Codegen
 import Header
 import Control.Monad ((>=>))
@@ -29,4 +30,4 @@ main = case run 0 $ go "(\\x: i32. x)(3)" of
        hClose h_out
 
 go :: String -> SLC [Word8]
-go = Parser.go >=> AST.go empty empty >=> CPS.go >=> ClosureConv.go >=> Hoist.go >=> Alloc.go >=> Codegen.go
+go = Parser.go >=> AST.go empty empty >=> CPS.go >=> ClosureConv.go >=> Hoist.go >=> Alloc.go >=> Regions.go >=> Codegen.go

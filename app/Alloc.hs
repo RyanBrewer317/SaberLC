@@ -13,15 +13,15 @@ import Control.Monad (mapAndUnzipM)
 import Data.Void (absurd)
 import Prelude hiding (id)
 
-data Decl = Malloc Id [TypeCPS U U U] | Init Id (ValCPS U U U) Int (ValCPS U U U)
+data Decl = Malloc Id [TypeCPS U U U V] | Init Id (ValCPS U U U V) Int (ValCPS U U U V)
 
-go :: [Stmt V] -> SLC [Stmt U]
+go :: [Stmt V V] -> SLC [Stmt U V]
 go = mapM goStmt
 
-goStmt :: Stmt V -> SLC (Stmt U)
+goStmt :: Stmt V V -> SLC (Stmt U V)
 goStmt (Func id tvars params body) = Func id tvars (map (second goType) params) <$> goExpr body
 
-goExpr :: ExprCPS U U V -> SLC (ExprCPS U U U)
+goExpr :: ExprCPS U U V V -> SLC (ExprCPS U U U V)
 goExpr e = case e of
     AppCPS f ts as -> do
         (f2, decls) <- goVal f
@@ -43,22 +43,22 @@ goExpr e = case e of
         (v2, decls) <- goVal v
         scope2 <- goExpr scope
         return $ putDecls decls $ UnpackCPS () t x v2 scope2
-    MallocCPS v _ _ _ -> absurd v
+    MallocCPS v _ _ _ _ -> absurd v
     InitCPS v _ _ _ _ _ -> absurd v
 
-putDecls :: [Decl] -> ExprCPS U U U -> ExprCPS U U U
+putDecls :: [Decl] -> ExprCPS U U U V -> ExprCPS U U U V
 putDecls decls e = foldr (\d e2 ->
         case d of
-            Malloc x ts -> MallocCPS () x ts e2
+            Malloc x ts -> MallocCPS () x ts NotAssignedRgn e2
             Init x tpl i v2 -> InitCPS () x tpl i v2 e2
         ) e decls
 
-goVal :: ValCPS U U V -> SLC (ValCPS U U U, [Decl])
+goVal :: ValCPS U U V V -> SLC (ValCPS U U U V, [Decl])
 goVal v = case v of
     LitCPS lit -> return (LitCPS lit, [])
     VarCPS x t global -> return (VarCPS x (goType t) global, [])
     LambdaCPS (NotTrue void) _ _ _ -> absurd void
-    TupleCPS NotFalse vs -> do
+    TupleCPS NotAssignedRgn NotFalse vs -> do
         (vs2, decls) <- mapAndUnzipM (goVal.snd) vs
         x <- fresh
         let xt = goType $ getValCPSType v
@@ -72,7 +72,7 @@ goVal v = case v of
         (v3, decls) <- goVal v2
         return (PackCPS () (goType t) v3 (goType t2), decls)
 
-getDecls :: [ValCPS U U U] -> Int -> ValCPS U U U -> SLC (ValCPS U U U, [Decl])
+getDecls :: [ValCPS U U U V] -> Int -> ValCPS U U U V -> SLC (ValCPS U U U V, [Decl])
 getDecls [] _ v = return (v, [])
 getDecls (v:vs) i last_var = do
     x <- fresh
@@ -81,10 +81,11 @@ getDecls (v:vs) i last_var = do
     (end, rest) <- getDecls vs (i+1) (VarCPS x xt False)
     return (end, decl:rest)
 
-goType :: TypeCPS U U V -> TypeCPS U U U
+goType :: TypeCPS U U V V -> TypeCPS U U U V
 goType t = case t of
     I32CPS -> I32CPS
     TVarCPS tv -> TVarCPS tv
     ArrowCPS xs ts -> ArrowCPS xs (map goType ts)
-    ProductCPS xs -> ProductCPS (map (\(_,t2)->(Initialized, goType t2)) xs)
+    ProductCPS NotAssignedRgn xs -> ProductCPS NotAssignedRgn (map (\(_,t2)->(Initialized, goType t2)) xs)
     ExistsCPS () x t2 -> ExistsCPS () x (goType t2)
+    HandleTypeCPS v _ -> absurd v
