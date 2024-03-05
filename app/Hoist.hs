@@ -16,7 +16,7 @@ go = goExpr >=> \(e, stmts) -> return $ Func (-1) [] [] e : stmts
 
 goExpr :: ExprCPS U V V V -> SLC (ExprCPS U U V V, [Stmt V V])
 goExpr e = case e of
-    AppCPS f ts as -> goVal f >>= \(f2,stmts)-> bimap (AppCPS f2 (map goType ts)) ((stmts++) . concat) <$> mapAndUnzipM goVal as
+    AppCPS f ts as -> goVal f >>= \(f2,stmts)-> bimap (AppCPS f2 (map goCTArg ts)) ((stmts++) . concat) <$> mapAndUnzipM goVal as
     HaltCPS v -> first HaltCPS <$> goVal v
     LetCPS x t v scope -> do
         (v2, stmts) <- goVal v
@@ -53,3 +53,9 @@ goType t = case t of
     ProductCPS NotAssignedRgn ts -> ProductCPS NotAssignedRgn (map (second goType) ts)
     ExistsCPS () x t2 -> ExistsCPS () x (goType t2)
     HandleTypeCPS void _ -> absurd void
+
+goCTArg :: CTArg U V V V -> CTArg U U V V
+goCTArg a = case a of
+    TypeCTArg t -> TypeCTArg $ goType t
+    RgnCTArg void _ -> absurd void
+    CapCTArg void _ -> absurd void

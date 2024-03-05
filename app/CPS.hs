@@ -37,7 +37,7 @@ goExpr e k = case e of
     TApp _t e1 targ -> do
         x <- fresh
         let xt = goType $ getType e1
-        goExpr e1 $ LambdaCPS NotFalse [] [(x, xt)] $ AppCPS (VarCPS x xt False) [goType targ] [k]
+        goExpr e1 $ LambdaCPS NotFalse [] [(x, xt)] $ AppCPS (VarCPS x xt False) [TypeCTArg $ goType targ] [k]
 
 goType :: Type -> TypeCPS V V V V
 goType t = case t of

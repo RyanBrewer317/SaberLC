@@ -26,7 +26,7 @@ goExpr e = case e of
     AppCPS f ts as -> do
         (f2, decls) <- goVal f
         (as2, decls2) <- mapAndUnzipM goVal as
-        return $ putDecls (decls ++ concat decls2) $ AppCPS f2 (map goType ts) as2
+        return $ putDecls (decls ++ concat decls2) $ AppCPS f2 (map goCTArg ts) as2
     HaltCPS v -> do
         (v2, decls) <- goVal v
         return $ putDecls decls $ HaltCPS v2
@@ -89,3 +89,9 @@ goType t = case t of
     ProductCPS NotAssignedRgn xs -> ProductCPS NotAssignedRgn (map (\(_,t2)->(Initialized, goType t2)) xs)
     ExistsCPS () x t2 -> ExistsCPS () x (goType t2)
     HandleTypeCPS v _ -> absurd v
+
+goCTArg :: CTArg U U V V -> CTArg U U U V
+goCTArg a = case a of
+    TypeCTArg t -> TypeCTArg $ goType t
+    RgnCTArg void _ -> absurd void
+    CapCTArg void _ -> absurd void

@@ -164,7 +164,7 @@ goStmt (Func id tvars params body) =
 goExpr :: Size RT -> Size CT -> Locals RT -> Locals CT -> ExprCPS U U U U -> ReverseOps
 goExpr rt_stack_size ct_stack_size rt_locals ct_locals e = case e of
     AppCPS f targs args ->
-        let (ct_stack_size2, targs_ops_rev) = foldr (\targ (i, ops_rev)-> (inc i, goType ct_stack_size ct_locals targ ++ ops_rev)) (ct_stack_size, []) targs in
+        let (ct_stack_size2, targs_ops_rev) = foldr (\targ (i, ops_rev)-> (inc i, goCTArg ct_stack_size ct_locals targ ++ ops_rev)) (ct_stack_size, []) targs in
         let (rt_stack_size2, args_ops_rev) = foldr (\arg (i, ops_rev)-> (inc i, goVal i ct_stack_size2 rt_locals ct_locals arg ++ ops_rev)) (rt_stack_size, []) args in
         let f_ops = goVal rt_stack_size2 ct_stack_size2 rt_locals ct_locals f in
             CallOp:f_ops++args_ops_rev++targs_ops_rev
@@ -203,13 +203,11 @@ goExpr rt_stack_size ct_stack_size rt_locals ct_locals e = case e of
 goVal :: Size RT -> Size CT -> Locals RT -> Locals CT -> ValCPS U U U U -> ReverseOps
 goVal rt_stack_size ct_stack_size rt_locals ct_locals v = case v of
     LitCPS i -> [LitOp i]
-    VarCPS x _t global -> case lookup x rt_locals of
-        Just pos -> [GetOp $ getLastOf rt_stack_size `diff` pos] -- (rt_stack_size - 1) is the position of the top of the stack. Getting the top of the stack thus correctly produces GetOp 0
-        Nothing ->
-            if global then
-                [GlobalFuncOp x]
-            else
-                trace (show (v, rt_locals)) undefined
+    VarCPS x _t global -> 
+        if global then
+            [GlobalFuncOp x]
+        else
+            rtGet rt_stack_size rt_locals x
     LambdaCPS (NotTrue void) _ _ _ -> absurd void
     TupleCPS _ (NotTrue void) _ -> absurd void
     TAppCPS () _ _ _ -> undefined
@@ -222,20 +220,16 @@ goVal rt_stack_size ct_stack_size rt_locals ct_locals v = case v of
 goType :: Size CT -> Locals CT -> TypeCPS U U U U -> ReverseOps
 goType ct_stack_size ct_locals t = case t of
     I32CPS -> [I32Op]
-    TVarCPS x -> case lookup x ct_locals of
-        Just pos -> [CTGetOp $ getLastOf ct_stack_size `diff` pos]
-        Nothing -> undefined
+    TVarCPS x -> ctGet ct_stack_size ct_locals x
     ArrowCPS kind_ctx params ->
         let (ct_locals2, ct_stack_size2, kind_ctx_ops) = foldr (\entry (locals, i, ops_rev)->(insert (getId entry) (getLastOf $ inc i) locals, inc i, ForallOp:ops_rev)) (ct_locals, ct_stack_size, []) kind_ctx in
         let (_, param_ops_rev) = foldr (\t2 (i, ops_rev)->let o = goType i ct_locals2 t2 in (inc i,o++ops_rev)) (ct_stack_size2, []) params in
         let close_forall_ops = replicate (length kind_ctx) LlarofOp in
         close_forall_ops ++ FuncOp (length params) : param_ops_rev ++ kind_ctx_ops
-    ProductCPS (Rgn id) ts -> case lookup id ct_locals of
-        Just pos ->
-            let r_ops = [CTGetOp $ getLastOf ct_stack_size `diff` pos] in
-            let (_, ts_ops_rev) = foldr (\(_,t2) (i, ops_rev)->let o = goType i ct_locals t2 in (inc i,o++ops_rev)) (inc ct_stack_size, r_ops) ts in
-            TupleOp (length ts) : ts_ops_rev
-        Nothing -> undefined
+    ProductCPS (Rgn id) ts -> 
+        let r_ops = ctGet ct_stack_size ct_locals id in
+        let (_, ts_ops_rev) = foldr (\(_,t2) (i, ops_rev)->let o = goType i ct_locals t2 in (inc i,o++ops_rev)) (inc ct_stack_size, r_ops) ts in
+        TupleOp (length ts) : ts_ops_rev
     ExistsCPS () x body ->
         let ct_stack_size2 = inc ct_stack_size in
         let body_ops_rev = goType ct_stack_size2 (insert x (getLastOf ct_stack_size2) ct_locals) body in
@@ -243,3 +237,21 @@ goType ct_stack_size ct_locals t = case t of
     HandleTypeCPS () id -> case lookup id ct_locals of
         Just pos -> [HandleOp, CTGetOp $ getLastOf ct_stack_size `diff` pos]
         Nothing -> undefined
+
+rtGet :: Size RT -> Locals RT -> Id -> [Op]
+rtGet rt_stack_size rt_locals id =
+    case lookup id rt_locals of
+        Just pos -> [GetOp $ getLastOf rt_stack_size `diff` pos]
+        Nothing -> undefined
+
+ctGet :: Size CT -> Locals CT -> Id -> [Op]
+ctGet ct_stack_size ct_locals id = 
+    case lookup id ct_locals of
+        Just pos -> [CTGetOp $ getLastOf ct_stack_size `diff` pos]
+        Nothing -> undefined
+
+goCTArg :: Size CT -> Locals CT -> CTArg U U U U -> ReverseOps
+goCTArg ct_stack_size ct_locals a = case a of
+    TypeCTArg t -> goType ct_stack_size ct_locals t
+    RgnCTArg () (Rgn id) -> ctGet ct_stack_size ct_locals id
+    CapCTArg () _c -> undefined

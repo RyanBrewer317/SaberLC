@@ -61,7 +61,7 @@ data ValCPS clos hoist alloc rgn = LitCPS Int
                                  | PackCPS clos (TypeCPS clos hoist alloc rgn) (ValCPS clos hoist alloc rgn) (TypeCPS clos hoist alloc rgn)
                                  deriving (Show, Eq)
 
-data ExprCPS clos hoist alloc rgn  = AppCPS (ValCPS clos hoist alloc rgn) [TypeCPS clos hoist alloc rgn] [ValCPS clos hoist alloc rgn]
+data ExprCPS clos hoist alloc rgn  = AppCPS (ValCPS clos hoist alloc rgn) [CTArg clos hoist alloc rgn] [ValCPS clos hoist alloc rgn]
                                    | HaltCPS (ValCPS clos hoist alloc rgn)
                                    | LetCPS Id (TypeCPS clos hoist alloc rgn) (ValCPS clos hoist alloc rgn) (ExprCPS clos hoist alloc rgn)
                                    | TupleProjCPS Id (ValCPS clos hoist alloc rgn) Int (ExprCPS clos hoist alloc rgn)
@@ -125,6 +125,11 @@ instance Eq (Cap c) where
    (==) (UniqueCap r1) (UniqueCap r2) = r1 == r2 
    (==) (VarCap id1) (VarCap id2) = id1 == id2 
    (==) _ _ = False
+
+data CTArg clos hoist alloc rgn = TypeCTArg (TypeCPS clos hoist alloc rgn) 
+                                | RgnCTArg rgn (Rgn rgn) 
+                                | CapCTArg rgn (Cap rgn) 
+                                deriving (Show, Eq)
 
 data KindContextEntry rgn where
    TypeEntry :: Id -> KindContextEntry rgn
@@ -227,7 +232,7 @@ prettyCPSExpr (AppCPS e ts xs) =
    if null ts then
       prettyCPSVal e ++ "(" ++ intercalate ", " (map prettyCPSVal xs) ++ ")"
    else
-      prettyCPSVal e ++ "[" ++ intercalate ", " (map prettyCPSType ts) ++ "](" ++ intercalate ", " (map prettyCPSVal xs) ++ ")"
+      prettyCPSVal e ++ "[" ++ intercalate ", " (map prettyCTArg ts) ++ "](" ++ intercalate ", " (map prettyCPSVal xs) ++ ")"
 prettyCPSExpr (HaltCPS e) = "halt(" ++ prettyCPSVal e ++ ")"
 prettyCPSExpr (LetCPS x t e1 e2) = "let x" ++ show x ++ ": " ++ prettyCPSType t ++ " = " ++ prettyCPSVal e1 ++ " in\n    " ++ prettyCPSExpr e2
 prettyCPSExpr (TupleProjCPS x tpl i cont) = "let x" ++ show x ++ " = proj(" ++ show i ++ ", " ++ prettyCPSVal tpl ++ ") in\n    " ++ prettyCPSExpr cont
@@ -235,6 +240,11 @@ prettyCPSExpr (UnpackCPS _ x y v cont) = "let [x" ++ show x ++ ", x" ++ show y +
 prettyCPSExpr (MallocCPS _ x ts NotAssignedRgn cont) = "let x" ++ show x ++ " = malloc(" ++ intercalate ", " (map prettyCPSType ts) ++ ") in\n    " ++ prettyCPSExpr cont
 prettyCPSExpr (MallocCPS _ x ts (Rgn id) cont) = "let x" ++ show x ++ " = malloc[r" ++ show id ++ "](" ++ intercalate ", " (map prettyCPSType ts) ++ ") in\n    " ++ prettyCPSExpr cont
 prettyCPSExpr (InitCPS _ x tpl i v cont) = "let x" ++ show x ++ " = init(" ++ show i ++ ", " ++ prettyCPSVal tpl ++ ", " ++ prettyCPSVal v ++ ") in\n    " ++ prettyCPSExpr cont
+
+prettyCTArg :: CTArg clos hoist alloc rgn -> String
+prettyCTArg (TypeCTArg t) = prettyCPSType t
+prettyCTArg (RgnCTArg _ r) = "r" ++ show r
+prettyCTArg (CapCTArg _ _) = undefined
 
 ids :: [KindContextEntry r] -> [Id]
 ids = map f

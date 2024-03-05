@@ -24,7 +24,7 @@ go e = case e of
       let (ExistsCPS () _id (ProductCPS NotAssignedRgn [(PreAlloc, tcode), (PreAlloc, TVarCPS _)])) = getValCPSType f2
       let prodt = ProductCPS NotAssignedRgn [(PreAlloc,tcode), (PreAlloc,TVarCPS gamma)]
       as2 <- mapM goVal as
-      ts2 <- mapM goType ts
+      ts2 <- mapM goCTArg ts
       return $ UnpackCPS () gamma z f2 $
             TupleProjCPS zcode (VarCPS z prodt False) 0 $
                TupleProjCPS zenv (VarCPS z prodt False) 1 $
@@ -45,7 +45,7 @@ goVal v = case v of
       let ts = ftvVal [] f
       t_env <- goType $ ProductCPS NotAssignedRgn $ map (\(_,t,_)->(PreAlloc,t)) ys
       -- let t_rawcode = ArrowCPS (ts++tvars) $ t_env : map (goType . snd) args -- used for recursion, which I don't support yet
-      t_code <- ArrowCPS tvars <$> ((t_env :) <$> mapM (goType . snd) args)
+      t_code <- ArrowCPS tvars . (t_env :) <$> mapM (goType . snd) args
       z_env <- fresh
       body2 <- go body
       args2 <- ((z_env, t_env) :) <$> mapM (\(x,t)-> goType t >>= \t2->return (x,t2)) args
@@ -92,7 +92,7 @@ fvVal bound v = case v of
 
 ftv :: [KindContextEntry V] -> ExprCPS V V V V -> [KindContextEntry V]
 ftv bound e = case e of
-   AppCPS f ts as -> ftvVal bound f ++ concatMap (ftvType bound) ts ++ concatMap (ftvVal bound) as
+   AppCPS f ts as -> ftvVal bound f ++ concatMap (ftvCTArg bound) ts ++ concatMap (ftvVal bound) as
    HaltCPS v -> ftvVal bound v
    LetCPS _id t v scope -> ftvVal bound v ++ ftvType bound t ++ ftv bound scope
    TupleProjCPS _id tpl _i scope -> ftvVal bound tpl ++ ftv bound scope
@@ -117,3 +117,15 @@ ftvType bound t = case t of
    ProductCPS NotAssignedRgn ts -> concatMap (ftvType bound . snd) ts
    ExistsCPS void _ _ -> absurd void
    HandleTypeCPS void _ -> absurd void
+
+ftvCTArg :: [KindContextEntry V] -> CTArg V V V V -> [KindContextEntry V]
+ftvCTArg bound a = case a of
+   TypeCTArg t -> ftvType bound t
+   RgnCTArg void _ -> absurd void
+   CapCTArg void _ -> absurd void
+
+goCTArg :: CTArg V V V V -> SLC (CTArg U V V V)
+goCTArg a = case a of
+    TypeCTArg t -> TypeCTArg <$> goType t
+    RgnCTArg void _ -> absurd void
+    CapCTArg void _ -> absurd void
