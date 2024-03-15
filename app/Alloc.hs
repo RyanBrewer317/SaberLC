@@ -19,7 +19,7 @@ go :: [Stmt V V] -> SLC [Stmt U V]
 go = mapM goStmt
 
 goStmt :: Stmt V V -> SLC (Stmt U V)
-goStmt (Func id tvars params body) = Func id tvars (map (second goType) params) <$> goExpr body
+goStmt (Func id tvars NotAssignedCap params body) = Func id tvars NotAssignedCap (map (second goType) params) <$> goExpr body
 
 goExpr :: ExprCPS U U V V -> SLC (ExprCPS U U U V)
 goExpr e = case e of
@@ -43,7 +43,7 @@ goExpr e = case e of
     (v2, decls) <- goVal v
     scope2 <- goExpr scope
     return $ putDecls decls $ UnpackCPS () t x v2 scope2
-  MallocCPS v _ _ _ _ -> absurd v
+  MallocCPS v _ _ _ _ _ -> absurd v
   InitCPS v _ _ _ _ _ -> absurd v
 
 putDecls :: [Decl] -> ExprCPS U U U V -> ExprCPS U U U V
@@ -51,7 +51,7 @@ putDecls decls e =
   foldr
     ( \d e2 ->
         case d of
-          Malloc x ts -> MallocCPS () x ts NotAssignedRgn e2
+          Malloc x ts -> MallocCPS () x ts NotAssignedRgn NotAssignedRgn e2
           Init x tpl i v2 -> InitCPS () x tpl i v2 e2
     )
     e
@@ -61,7 +61,7 @@ goVal :: ValCPS U U V V -> SLC (ValCPS U U U V, [Decl])
 goVal v = case v of
   LitCPS lit -> return (LitCPS lit, [])
   VarCPS x t global -> return (VarCPS x (goType t) global, [])
-  LambdaCPS (NotTrue void) _ _ _ -> absurd void
+  LambdaCPS (NotTrue void) _ _ _ _ -> absurd void
   TupleCPS NotAssignedRgn NotFalse vs -> do
     (vs2, decls) <- mapAndUnzipM (goVal . snd) vs
     x <- fresh
@@ -89,7 +89,7 @@ goType :: TypeCPS U U V V -> TypeCPS U U U V
 goType t = case t of
   I32CPS -> I32CPS
   TVarCPS tv -> TVarCPS tv
-  ArrowCPS xs ts -> ArrowCPS xs (map goType ts)
+  ArrowCPS xs NotAssignedCap ts -> ArrowCPS xs NotAssignedCap (map goType ts)
   ProductCPS NotAssignedRgn xs -> ProductCPS NotAssignedRgn (map (\(_, t2) -> (Initialized, goType t2)) xs)
   ExistsCPS () x t2 -> ExistsCPS () x (goType t2)
   HandleTypeCPS v _ -> absurd v

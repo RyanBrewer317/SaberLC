@@ -4,6 +4,7 @@
    file You can obtain one at https:--mozilla.org/MPL/2.0/.
 -}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Codegen (go) where
 
@@ -13,8 +14,10 @@ import qualified Data.Map as Map
 import Data.Void (absurd)
 import Data.Word (Word32, Word8)
 import Debug.Trace (trace)
+import GHC.IO (unsafePerformIO)
 import Header
 import Prelude hiding (id, lookup)
+import qualified Prelude as P
 
 go :: [Stmt U U] -> SLC [Word8]
 go stmts =
@@ -29,7 +32,7 @@ go stmts =
           stmts
    in let stmts_ops = NewRgnOp : GlobalFuncOp (-1) : CallOp : EndFunctionOp : reverse stmts_ops_rev
        in return $
-            trace (show stmts_ops) $
+            unsafePerformIO (writeFile "t.txt" (unlines (map show stmts_ops)) >> return P.id) $
               (\bytes -> 0 : 0 : 0 : 0 : bytes) $
                 foldr
                   ( \op ops ->
@@ -111,6 +114,8 @@ data Op
   | FreeRgnOp -- 0x24
   | ForallOp -- 0x25
   | LlarofOp -- 0x26
+  | RgnPolyOp -- 0x27
+  | YlopNgrOp -- 0x28
   deriving (Show)
 
 type ReverseOps = [Op]
@@ -168,31 +173,37 @@ opToBytes op = case op of
   FreeRgnOp -> [0x24]
   ForallOp -> [0x25]
   LlarofOp -> [0x26]
+  RgnPolyOp -> [0x27]
+  YlopNgrOp -> [0x28]
 
 goStmt :: Stmt U U -> (Id, ReverseOps)
-goStmt (Func id tvars params body) =
+goStmt (Func id ctx c params body) =
   let (ct_stack_size, tvar_ops_rev, ct_locals) =
         foldr
-          ( \x (i, ops_rev, locals) ->
+          ( \entry (i, ops_rev, locals) ->
               let new_i = inc i
-               in (new_i, AllOp : PtrOp : ops_rev, insert x (getLastOf new_i) locals)
+               in case entry of
+                    TypeEntry x -> (new_i, AllOp : PtrOp : ops_rev, insert x (getLastOf new_i) locals)
+                    RgnEntry x -> (new_i, RegionOp : ops_rev, insert x (getLastOf new_i) locals)
+                    CapEntry _ _ -> undefined
           )
-          (Size 1, [], Locals empty)
-          (reverse $ ids tvars)
-   in let (_, params_ops_rev, rt_locals) =
-            foldr
-              ( \(x, t) (i, ops_rev, locals) ->
-                  (dec i, ReqOp : goType ct_stack_size ct_locals t ++ ops_rev, insert x (getLastOf i) locals)
-              )
-              (Size (length params + 1), [], Locals empty)
-              (reverse params)
-       in let body_ops = goExpr (inc $ Size $ length params) (inc ct_stack_size) (trace (show rt_locals) rt_locals) ct_locals body
-           in (id, EndFunctionOp : body_ops ++ params_ops_rev ++ tvar_ops_rev)
+          (Size 0, [], Locals empty)
+          (reverse ctx)
+   in let c_ops = ReqOp : goCap ct_stack_size ct_locals c
+       in let (_, params_ops_rev, rt_locals) =
+                foldr
+                  ( \(x, t) (i, ops_rev, locals) ->
+                      (dec i, ReqOp : goType ct_stack_size ct_locals t ++ ops_rev, insert x (getLastOf i) locals)
+                  )
+                  (Size (length params + 1), [], Locals empty)
+                  (reverse params)
+           in let body_ops = goExpr (inc $ Size $ length params) ct_stack_size rt_locals ct_locals body
+               in (id, EndFunctionOp : body_ops ++ params_ops_rev ++ c_ops ++ tvar_ops_rev)
 
 goExpr :: Size RT -> Size CT -> Locals RT -> Locals CT -> ExprCPS U U U U -> ReverseOps
 goExpr rt_stack_size ct_stack_size rt_locals ct_locals e = case e of
   AppCPS f targs args ->
-    let (ct_stack_size2, targs_ops_rev) = foldr (\targ (i, ops_rev) -> (inc i, goCTArg ct_stack_size ct_locals targ ++ ops_rev)) (ct_stack_size, []) targs
+    let (ct_stack_size2, targs_ops_rev) = foldr (\targ (i, ops_rev) -> (inc i, goCTArg ct_stack_size (trace ("HI! " ++ prettyCPSVal f ++ show ct_locals ++ show ct_stack_size) ct_locals) targ ++ ops_rev)) (ct_stack_size, []) targs
      in let (rt_stack_size2, args_ops_rev) = foldr (\arg (i, ops_rev) -> (inc i, goVal i ct_stack_size2 rt_locals ct_locals arg ++ ops_rev)) (rt_stack_size, []) args
          in let f_ops = goVal rt_stack_size2 ct_stack_size2 rt_locals ct_locals f
              in CallOp : f_ops ++ args_ops_rev ++ targs_ops_rev
@@ -213,12 +224,14 @@ goExpr rt_stack_size ct_stack_size rt_locals ct_locals e = case e of
      in let rt_stack_size2 = inc rt_stack_size
          in let scope_ops = goExpr rt_stack_size2 ct_stack_size (insert y (getLastOf rt_stack_size2) rt_locals) ct_locals scope
              in scope_ops ++ UnpackOp : v_ops
-  MallocCPS () x ts (Rgn handle) scope ->
+  MallocCPS () x ts (Rgn r) (Rgn handle) scope ->
     let handle_ops = goVal rt_stack_size ct_stack_size rt_locals ct_locals (VarCPS handle undefined False)
-     in let (ct_stack_size2, ts_ops) = foldr (\t (i, ops_rev) -> (inc i, goType i ct_locals t ++ ops_rev)) (ct_stack_size, []) ts
+    in let r_ops = ctGet ct_stack_size ct_locals r
+    in let ct_stack_size2 = inc ct_stack_size -- push r
+     in let (_, ts_ops) = foldr (\t (i, ops_rev) -> (inc i, goType i ct_locals t ++ ops_rev)) (ct_stack_size2, []) ts
          in let rt_stack_size2 = inc rt_stack_size -- push handle, pop handle, push tuple
-             in let scope_ops = goExpr rt_stack_size2 ct_stack_size2 (insert x (getLastOf rt_stack_size2) rt_locals) ct_locals scope
-                 in scope_ops ++ MallocOp : TupleOp (length ts_ops) : ts_ops ++ handle_ops
+             in let scope_ops = goExpr rt_stack_size2 ct_stack_size (insert x (getLastOf rt_stack_size2) rt_locals) ct_locals scope -- ct_stack_size because the ct stack should be back where it started now
+                 in scope_ops ++ MallocOp : TupleOp (length ts) : ts_ops ++ r_ops ++ handle_ops
   InitCPS () x tpl i v scope ->
     let tpl_ops = goVal rt_stack_size ct_stack_size rt_locals ct_locals tpl
      in let rt_stack_size2 = inc rt_stack_size -- push
@@ -237,7 +250,7 @@ goVal rt_stack_size ct_stack_size rt_locals ct_locals v = case v of
         [GlobalFuncOp x]
       else
         rtGet rt_stack_size rt_locals x
-  LambdaCPS (NotTrue void) _ _ _ -> absurd void
+  LambdaCPS (NotTrue void) _ _ _ _ -> absurd void
   TupleCPS _ (NotTrue void) _ -> absurd void
   TAppCPS () _ _ _ -> undefined
   PackCPS () t v2 exist_t ->
@@ -250,11 +263,39 @@ goType :: Size CT -> Locals CT -> TypeCPS U U U U -> ReverseOps
 goType ct_stack_size ct_locals t = case t of
   I32CPS -> [I32Op]
   TVarCPS x -> ctGet ct_stack_size ct_locals x
-  ArrowCPS kind_ctx params ->
-    let (ct_locals2, ct_stack_size2, kind_ctx_ops) = foldr (\entry (locals, i, ops_rev) -> (insert (getId entry) (getLastOf $ inc i) locals, inc i, ForallOp : ops_rev)) (ct_locals, ct_stack_size, []) kind_ctx
-     in let (_, param_ops_rev) = foldr (\t2 (i, ops_rev) -> let o = goType i ct_locals2 t2 in (inc i, o ++ ops_rev)) (ct_stack_size2, []) params
-         in let close_forall_ops = replicate (length kind_ctx) LlarofOp
-             in close_forall_ops ++ FuncOp (length params) : param_ops_rev ++ kind_ctx_ops
+  ArrowCPS kind_ctx c params ->
+    let (ct_locals2, ct_stack_size2, kind_ctx_ops) =
+          foldr
+            ( \entry (locals, i, ops_rev) ->
+                let o = case entry of
+                      TypeEntry _ -> ForallOp : PtrOp : ops_rev
+                      RgnEntry _ -> RgnPolyOp : ops_rev
+                      CapEntry _ _ -> undefined
+                 in let new_i = inc i
+                     in let new_locals = insert (getId entry) (getLastOf new_i) locals
+                         in (new_locals, new_i, o)
+            )
+            (ct_locals, ct_stack_size, [])
+            kind_ctx
+     in let c_ops = goCap ct_stack_size2 ct_locals2 c
+         in let ct_stack_size3 = inc ct_stack_size2 -- adding the capability c
+             in let (_, param_ops_rev) =
+                      foldr
+                        ( \t2 (i, ops_rev) ->
+                            let o = goType i ct_locals2 t2
+                             in (inc i, o ++ ops_rev)
+                        )
+                        (ct_stack_size3, [])
+                        params
+                 in let close_forall_ops =
+                          map
+                            ( \case
+                                TypeEntry _ -> LlarofOp
+                                RgnEntry _ -> YlopNgrOp
+                                CapEntry _ _ -> undefined
+                            )
+                            (reverse kind_ctx)
+                     in close_forall_ops ++ FuncOp (length params) : param_ops_rev ++ c_ops ++ kind_ctx_ops
   ProductCPS (Rgn id) ts ->
     let r_ops = ctGet ct_stack_size ct_locals id
      in let (_, ts_ops_rev) = foldr (\(_, t2) (i, ops_rev) -> let o = goType i ct_locals t2 in (inc i, o ++ ops_rev)) (inc ct_stack_size, r_ops) ts
@@ -282,3 +323,13 @@ goCTArg ct_stack_size ct_locals a = case a of
   TypeCTArg t -> goType ct_stack_size ct_locals t
   RgnCTArg () (Rgn id) -> ctGet ct_stack_size ct_locals id
   CapCTArg () _c -> undefined
+
+goCap :: Size CT -> Locals CT -> Cap U -> ReverseOps
+goCap ct_stack_size ct_locals c = case c of
+  RWCap r -> RWOp : goRegion ct_stack_size ct_locals r
+  UniqueCap r -> UniqueOp : goRegion ct_stack_size ct_locals r
+  VarCap x -> ctGet ct_stack_size ct_locals x
+
+goRegion :: Size CT -> Locals CT -> Rgn U -> ReverseOps
+goRegion ct_stack_size ct_locals r = case r of
+  Rgn id -> ctGet ct_stack_size ct_locals id

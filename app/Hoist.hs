@@ -13,7 +13,7 @@ import Data.Void (absurd)
 import Header
 
 go :: ExprCPS U V V V -> SLC [Stmt V V]
-go = goExpr >=> \(e, stmts) -> return $ Func (-1) [] [] e : stmts
+go = goExpr >=> \(e, stmts) -> return $ Func (-1) [] NotAssignedCap [] e : stmts
 
 goExpr :: ExprCPS U V V V -> SLC (ExprCPS U U V V, [Stmt V V])
 goExpr e = case e of
@@ -31,17 +31,17 @@ goExpr e = case e of
     (v2, stmts) <- goVal v
     (scope2, stmts2) <- goExpr scope
     return (UnpackCPS () x y v2 scope2, stmts ++ stmts2)
-  MallocCPS v _ _ _ _ -> absurd v
+  MallocCPS v _ _ _ _ _ -> absurd v
   InitCPS v _ _ _ _ _ -> absurd v
 
 goVal :: ValCPS U V V V -> SLC (ValCPS U U V V, [Stmt V V])
 goVal v = case v of
   LitCPS i -> return (LitCPS i, [])
   VarCPS x t global -> return (VarCPS x (goType t) global, [])
-  f@(LambdaCPS _ tvars xs e) -> do
+  f@(LambdaCPS _ tvars NotAssignedCap xs e) -> do
     x <- fresh
     (e2, stmts) <- goExpr e
-    return (VarCPS x (goType $ getValCPSType f) True, Func x tvars (map (second goType) xs) e2 : stmts)
+    return (VarCPS x (goType $ getValCPSType f) True, Func x tvars NotAssignedCap (map (second goType) xs) e2 : stmts)
   TupleCPS NotAssignedRgn n xs -> bimap (TupleCPS NotAssignedRgn n) concat <$> mapAndUnzipM (\(PreAlloc, x) -> goVal x >>= \(x2, stmts) -> return ((PreAlloc, x2), stmts)) xs
   TAppCPS () t e ts -> goVal e >>= \(e2, stmts) -> return (TAppCPS () (goType t) e2 (map goType ts), stmts)
   PackCPS () t v2 t2 -> goVal v2 >>= \(v3, stmts) -> return (PackCPS () (goType t) v3 (goType t2), stmts)
@@ -50,7 +50,7 @@ goType :: TypeCPS U V V V -> TypeCPS U U V V
 goType t = case t of
   I32CPS -> I32CPS
   TVarCPS x -> TVarCPS x
-  ArrowCPS tvars xs -> ArrowCPS tvars (map goType xs)
+  ArrowCPS tvars NotAssignedCap xs -> ArrowCPS tvars NotAssignedCap (map goType xs)
   ProductCPS NotAssignedRgn ts -> ProductCPS NotAssignedRgn (map (second goType) ts)
   ExistsCPS () x t2 -> ExistsCPS () x (goType t2)
   HandleTypeCPS void _ -> absurd void

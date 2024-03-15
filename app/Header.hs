@@ -54,7 +54,7 @@ data Expr
 data TypeCPS clos hoist alloc rgn
   = I32CPS
   | TVarCPS Id
-  | ArrowCPS [KindContextEntry rgn] [TypeCPS clos hoist alloc rgn]
+  | ArrowCPS [KindContextEntry rgn] (Cap rgn) [TypeCPS clos hoist alloc rgn]
   | ProductCPS (Rgn rgn) [(Alloc alloc, TypeCPS clos hoist alloc rgn)]
   | ExistsCPS clos Id (TypeCPS clos hoist alloc rgn)
   | HandleTypeCPS rgn Id
@@ -63,7 +63,7 @@ data TypeCPS clos hoist alloc rgn
 data ValCPS clos hoist alloc rgn
   = LitCPS Int
   | VarCPS Id (TypeCPS clos hoist alloc rgn) Bool
-  | LambdaCPS (Not hoist) [KindContextEntry rgn] [(Id, TypeCPS clos hoist alloc rgn)] (ExprCPS clos hoist alloc rgn)
+  | LambdaCPS (Not hoist) [KindContextEntry rgn] (Cap rgn) [(Id, TypeCPS clos hoist alloc rgn)] (ExprCPS clos hoist alloc rgn)
   | TupleCPS (Rgn rgn) (Not alloc) [(Alloc alloc, ValCPS clos hoist alloc rgn)]
   | TAppCPS clos (TypeCPS clos hoist alloc rgn) (ValCPS clos hoist alloc rgn) [TypeCPS clos hoist alloc rgn]
   | PackCPS clos (TypeCPS clos hoist alloc rgn) (ValCPS clos hoist alloc rgn) (TypeCPS clos hoist alloc rgn)
@@ -75,7 +75,7 @@ data ExprCPS clos hoist alloc rgn
   | LetCPS Id (TypeCPS clos hoist alloc rgn) (ValCPS clos hoist alloc rgn) (ExprCPS clos hoist alloc rgn)
   | TupleProjCPS Id (ValCPS clos hoist alloc rgn) Int (ExprCPS clos hoist alloc rgn)
   | UnpackCPS clos Id Id (ValCPS clos hoist alloc rgn) (ExprCPS clos hoist alloc rgn)
-  | MallocCPS alloc Id [TypeCPS clos hoist alloc rgn] (Rgn rgn) (ExprCPS clos hoist alloc rgn)
+  | MallocCPS alloc Id [TypeCPS clos hoist alloc rgn] (Rgn rgn) (Rgn rgn) (ExprCPS clos hoist alloc rgn)
   | InitCPS alloc Id (ValCPS clos hoist alloc rgn) Int (ValCPS clos hoist alloc rgn) (ExprCPS clos hoist alloc rgn)
   deriving (Show, Eq)
 
@@ -138,6 +138,13 @@ instance Eq (Cap c) where
   (==) (VarCap id1) (VarCap id2) = id1 == id2
   (==) _ _ = False
 
+capWithDefault :: Cap c -> a -> (Cap U -> a) -> a
+capWithDefault c defaultCap f = case c of
+  NotAssignedCap -> defaultCap
+  RWCap _ -> f c
+  UniqueCap _ -> f c
+  VarCap _ -> f c
+
 data CTArg clos hoist alloc rgn
   = TypeCTArg (TypeCPS clos hoist alloc rgn)
   | RgnCTArg rgn (Rgn rgn)
@@ -180,13 +187,13 @@ getTypeCPS (HaltCPS v) = getValCPSType v
 getTypeCPS (LetCPS _ _ _ e) = getTypeCPS e
 getTypeCPS (TupleProjCPS _ _ _ e) = getTypeCPS e
 getTypeCPS (UnpackCPS _ _ _ _ e) = getTypeCPS e
-getTypeCPS (MallocCPS _ _ _ _ e) = getTypeCPS e
+getTypeCPS (MallocCPS _ _ _ _ _ e) = getTypeCPS e
 getTypeCPS (InitCPS _ _ _ _ _ e) = getTypeCPS e
 
 getValCPSType :: ValCPS clos hoist alloc rgn -> TypeCPS clos hoist alloc rgn
 getValCPSType (LitCPS _) = I32CPS
 getValCPSType (VarCPS _ t _) = t
-getValCPSType (LambdaCPS _ tvars ts _) = ArrowCPS tvars (map snd ts)
+getValCPSType (LambdaCPS _ tvars c ts _) = ArrowCPS tvars c (map snd ts)
 getValCPSType (TupleCPS r _ vs) = ProductCPS r (map (second getValCPSType) vs)
 getValCPSType (TAppCPS _ t _ _) = t
 getValCPSType (PackCPS _ _ _ t) = t
@@ -222,10 +229,11 @@ prettyExpr (Lit x) = show x
 prettyCPSType :: TypeCPS clos hoist alloc rgn -> String
 prettyCPSType I32CPS = "i32"
 prettyCPSType (TVarCPS x) = "x" ++ show x
-prettyCPSType (ArrowCPS xs ts) =
+prettyCPSType (ArrowCPS xs c ts) =
+  let capStr = capWithDefault c "" (\cap -> "{" ++ prettyCap cap ++ "}") in
   if null xs
-    then "(" ++ intercalate ", " (map prettyCPSType ts) ++ ")->0"
-    else "∀" ++ intercalate ", " (map (("x" ++) . show) xs) ++ ". (" ++ intercalate ", " (map prettyCPSType ts) ++ ")->0"
+    then capStr ++ "(" ++ intercalate ", " (map prettyCPSType ts) ++ ")->0"
+    else "∀" ++ capStr ++ intercalate ", " (map (("x" ++) . show) xs) ++ ". (" ++ intercalate ", " (map prettyCPSType ts) ++ ")->0"
 prettyCPSType (ProductCPS NotAssignedRgn ts) = "(" ++ intercalate "," (map (prettyCPSType . snd) ts) ++ ")"
 prettyCPSType (ProductCPS (Rgn id) ts) = "(" ++ intercalate "," (map (prettyCPSType . snd) ts) ++ ")@r" ++ show id
 prettyCPSType (ExistsCPS _ x t) = "∃x" ++ show x ++ ". " ++ prettyCPSType t
@@ -234,12 +242,13 @@ prettyCPSType (HandleTypeCPS _ id) = "handle(r" ++ show id ++ ")"
 prettyCPSVal :: ValCPS clos hoist alloc rgn -> String
 prettyCPSVal (LitCPS x) = show x
 prettyCPSVal (VarCPS x _t _global) = "x" ++ show x
-prettyCPSVal (LambdaCPS _ tvars xs e) =
+prettyCPSVal (LambdaCPS _ tvars c xs e) =
+  let capStr = capWithDefault c "" (\cap -> "{" ++ prettyCap cap ++ "}") in
   if null tvars
     then
-      "(λ" ++ intercalate ", " (map (\(x, t) -> "x" ++ show x ++ ": " ++ prettyCPSType t) xs) ++ ". " ++ prettyCPSExpr e ++ ")"
+      "(λ" ++ capStr ++ intercalate ", " (map (\(x, t) -> "x" ++ show x ++ ": " ++ prettyCPSType t) xs) ++ ". " ++ prettyCPSExpr e ++ ")"
     else
-      "(λ[" ++ intercalate ", " (map (("x" ++) . show) tvars) ++ "]" ++ intercalate ", " (map (\(x, t) -> "x" ++ show x ++ ": " ++ prettyCPSType t) xs) ++ ". " ++ prettyCPSExpr e ++ ")"
+      "(λ<" ++ intercalate ", " (map (("x" ++) . show) tvars) ++ "]" ++ capStr ++ intercalate ", " (map (\(x, t) -> "x" ++ show x ++ ": " ++ prettyCPSType t) xs) ++ ". " ++ prettyCPSExpr e ++ ")"
 prettyCPSVal (TupleCPS _ _ xs) = "(" ++ intercalate ", " (map (prettyCPSVal . snd) xs) ++ ")"
 prettyCPSVal (TAppCPS _ _ e ts) = prettyCPSVal e ++ "[" ++ intercalate ", " (map prettyCPSType ts) ++ "]"
 prettyCPSVal (PackCPS _ t v t') = "pack[" ++ prettyCPSType t ++ ", " ++ prettyCPSVal v ++ "] as " ++ prettyCPSType t'
@@ -255,14 +264,19 @@ prettyCPSExpr (HaltCPS e) = "halt(" ++ prettyCPSVal e ++ ")"
 prettyCPSExpr (LetCPS x t e1 e2) = "let x" ++ show x ++ ": " ++ prettyCPSType t ++ " = " ++ prettyCPSVal e1 ++ " in\n    " ++ prettyCPSExpr e2
 prettyCPSExpr (TupleProjCPS x tpl i cont) = "let x" ++ show x ++ " = proj(" ++ show i ++ ", " ++ prettyCPSVal tpl ++ ") in\n    " ++ prettyCPSExpr cont
 prettyCPSExpr (UnpackCPS _ x y v cont) = "let [x" ++ show x ++ ", x" ++ show y ++ "] = unpack(" ++ prettyCPSVal v ++ ") in\n    " ++ prettyCPSExpr cont
-prettyCPSExpr (MallocCPS _ x ts NotAssignedRgn cont) = "let x" ++ show x ++ " = malloc(" ++ intercalate ", " (map prettyCPSType ts) ++ ") in\n    " ++ prettyCPSExpr cont
-prettyCPSExpr (MallocCPS _ x ts (Rgn id) cont) = "let x" ++ show x ++ " = malloc[r" ++ show id ++ "](" ++ intercalate ", " (map prettyCPSType ts) ++ ") in\n    " ++ prettyCPSExpr cont
+prettyCPSExpr (MallocCPS _ x ts NotAssignedRgn NotAssignedRgn cont) = "let x" ++ show x ++ " = malloc(" ++ intercalate ", " (map prettyCPSType ts) ++ ") in\n    " ++ prettyCPSExpr cont
+prettyCPSExpr (MallocCPS _ x ts (Rgn r) (Rgn _rh) cont) = "let x" ++ show x ++ " = malloc[r" ++ show r ++ "](" ++ intercalate ", " (map prettyCPSType ts) ++ ") in\n    " ++ prettyCPSExpr cont
 prettyCPSExpr (InitCPS _ x tpl i v cont) = "let x" ++ show x ++ " = init(" ++ show i ++ ", " ++ prettyCPSVal tpl ++ ", " ++ prettyCPSVal v ++ ") in\n    " ++ prettyCPSExpr cont
 
 prettyCTArg :: CTArg clos hoist alloc rgn -> String
 prettyCTArg (TypeCTArg t) = prettyCPSType t
 prettyCTArg (RgnCTArg _ r) = "r" ++ show r
 prettyCTArg (CapCTArg _ _) = undefined
+
+prettyCap :: Cap U -> String
+prettyCap (RWCap id) = "+r" ++ show id
+prettyCap (UniqueCap id) = "1r" ++ show id
+prettyCap (VarCap id) = "c" ++ show id
 
 ids :: [KindContextEntry r] -> [Id]
 ids = map f
@@ -271,10 +285,12 @@ ids = map f
     f (RgnEntry id) = id
     f (CapEntry id _) = id
 
-data Stmt alloc rgn = Func Id [KindContextEntry rgn] [(Id, TypeCPS U U alloc rgn)] (ExprCPS U U alloc rgn) deriving (Show, Eq)
+data Stmt alloc rgn = Func Id [KindContextEntry rgn] (Cap rgn) [(Id, TypeCPS U U alloc rgn)] (ExprCPS U U alloc rgn) deriving (Show, Eq)
 
 prettyStmt :: Stmt alloc rgn -> String
-prettyStmt (Func x tvars params e) = "fn x" ++ show x ++ "[" ++ intercalate ", " (map show tvars) ++ "](" ++ intercalate ", " (map (\(param, t) -> "x" ++ show param ++ ": " ++ prettyCPSType t) params) ++ ") {\n    " ++ prettyCPSExpr e ++ "\n}\n\n"
+prettyStmt (Func x tvars c params e) = 
+  let capStr = capWithDefault c "" (\cap -> "{" ++ prettyCap cap ++ "}") in
+  "fn x" ++ show x ++ "[" ++ intercalate ", " (map show tvars) ++ "]" ++ capStr ++ "(" ++ intercalate ", " (map (\(param, t) -> "x" ++ show param ++ ": " ++ prettyCPSType t) params) ++ ") {\n    " ++ prettyCPSExpr e ++ "\n}\n\n"
 
 data Error
   = ParseError String

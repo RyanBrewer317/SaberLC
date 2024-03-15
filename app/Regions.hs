@@ -16,13 +16,13 @@ go :: [Stmt U V] -> SLC [Stmt U U]
 go = mapM goStmt
 
 goStmt :: Stmt U V -> SLC (Stmt U U)
-goStmt (Func x tvars params body) = do
+goStmt (Func x tvars NotAssignedCap params body) = do
   r <- fresh
   rh <- fresh
   let tvars2 = map goEntry tvars
   params2 <- mapM (\(a, b) -> (a,) <$> goType r rh b) params
   body2 <- goExpr r rh body
-  return $ Func x (RgnEntry r : tvars2) ((rh, HandleTypeCPS () r) : params2) body2
+  return $ Func x (RgnEntry r : tvars2) (RWCap $ Rgn r) ((rh, HandleTypeCPS () r) : params2) body2
 
 goExpr :: Id -> Id -> ExprCPS U U U V -> SLC (ExprCPS U U U U)
 goExpr r rh e = case e of
@@ -30,7 +30,7 @@ goExpr r rh e = case e of
     f2 <- goVal r rh f
     targs2 <- mapM (goCTArg r rh) targs
     args2 <- mapM (goVal r rh) args
-    return $ AppCPS f2 targs2 args2
+    return $ AppCPS f2 (RgnCTArg () (Rgn r) : targs2) (VarCPS rh (HandleTypeCPS () r) False : args2)
   HaltCPS v -> HaltCPS <$> goVal r rh v
   LetCPS x t v scope -> do
     t2 <- goType r rh t
@@ -45,10 +45,10 @@ goExpr r rh e = case e of
     v2 <- goVal r rh v
     scope2 <- goExpr r rh scope
     return $ UnpackCPS () x y v2 scope2
-  MallocCPS () x ts NotAssignedRgn scope -> do
+  MallocCPS () x ts NotAssignedRgn NotAssignedRgn scope -> do
     ts2 <- mapM (goType r rh) ts
     scope2 <- goExpr r rh scope
-    return $ MallocCPS () x ts2 (Rgn rh) scope2
+    return $ MallocCPS () x ts2 (Rgn r) (Rgn rh) scope2
   InitCPS () x tpl i v scope -> do
     tpl2 <- goVal r rh tpl
     v2 <- goVal r rh v
@@ -61,7 +61,7 @@ goVal r rh v = case v of
   VarCPS id t global -> do
     t2 <- goType r rh t
     return $ VarCPS id t2 global
-  LambdaCPS (NotTrue void) _ _ _ -> absurd void
+  LambdaCPS (NotTrue void) _ _ _ _ -> absurd void
   TupleCPS _ (NotTrue void) _ -> absurd void
   TAppCPS () t f ts -> do
     t2 <- goType r rh t
@@ -78,10 +78,10 @@ goType :: Id -> Id -> TypeCPS U U U V -> SLC (TypeCPS U U U U)
 goType r rh t = case t of
   I32CPS -> return I32CPS
   TVarCPS id -> return $ TVarCPS id
-  ArrowCPS tvars params -> do
+  ArrowCPS tvars NotAssignedCap params -> do
     r2 <- fresh
     params2 <- mapM (goType r rh) params
-    return $ ArrowCPS (RgnEntry r2 : map goEntry tvars) (HandleTypeCPS () r2 : params2)
+    return $ ArrowCPS (RgnEntry r2 : map goEntry tvars) (RWCap $ Rgn r2) (HandleTypeCPS () r2 : params2)
   ProductCPS NotAssignedRgn ts -> do
     ts2 <- mapM (\(a, b) -> (a,) <$> goType r rh b) ts
     return $ ProductCPS (Rgn r) ts2

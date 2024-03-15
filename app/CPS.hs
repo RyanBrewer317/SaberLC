@@ -13,7 +13,7 @@ go :: Expr -> SLC (ExprCPS V V V V)
 go e = do
   x <- fresh
   let t = goType $ getType e
-  goExpr e (LambdaCPS NotFalse [] [(x, t)] $ HaltCPS $ VarCPS x t False)
+  goExpr e (LambdaCPS NotFalse [] NotAssignedCap [(x, t)] $ HaltCPS $ VarCPS x t False)
 
 goExpr :: Expr -> ValCPS V V V V -> SLC (ExprCPS V V V V)
 goExpr e k = case e of
@@ -21,30 +21,30 @@ goExpr e k = case e of
   Lit i -> return $ AppCPS k [] [LitCPS i]
   Lambda x t body -> do
     cont <- fresh
-    let cont_t = ArrowCPS [] [goType $ getType body]
+    let cont_t = ArrowCPS [] NotAssignedCap [goType $ getType body]
     body2 <- goExpr body $ VarCPS cont cont_t False
-    return $ AppCPS k [] [LambdaCPS NotFalse [] [(x, goType t), (cont, cont_t)] body2]
+    return $ AppCPS k [] [LambdaCPS NotFalse [] NotAssignedCap [(x, goType t), (cont, cont_t)] body2]
   App _t e1 e2 -> do
     x1 <- fresh
     x2 <- fresh
     cont <-
       goExpr e2 $
-        LambdaCPS NotFalse [] [(x2, goType $ getType e2)] $
+        LambdaCPS NotFalse [] NotAssignedCap [(x2, goType $ getType e2)] $
           AppCPS (VarCPS x1 (goType $ getType e1) False) [] [VarCPS x2 (goType $ getType e2) False, k]
-    goExpr e1 $ LambdaCPS NotFalse [] [(x1, goType $ getType e1)] cont
+    goExpr e1 $ LambdaCPS NotFalse [] NotAssignedCap [(x1, goType $ getType e1)] cont
   TLambda x body -> do
     cont <- fresh
-    let cont_t = ArrowCPS [] [goType $ getType body]
+    let cont_t = ArrowCPS [] NotAssignedCap [goType $ getType body]
     body2 <- goExpr body $ VarCPS cont cont_t False
-    return $ AppCPS k [] [LambdaCPS NotFalse [TypeEntry x] [(cont, cont_t)] body2]
+    return $ AppCPS k [] [LambdaCPS NotFalse [TypeEntry x] NotAssignedCap [(cont, cont_t)] body2]
   TApp _t e1 targ -> do
     x <- fresh
     let xt = goType $ getType e1
-    goExpr e1 $ LambdaCPS NotFalse [] [(x, xt)] $ AppCPS (VarCPS x xt False) [TypeCTArg $ goType targ] [k]
+    goExpr e1 $ LambdaCPS NotFalse [] NotAssignedCap [(x, xt)] $ AppCPS (VarCPS x xt False) [TypeCTArg $ goType targ] [k]
 
 goType :: Type -> TypeCPS V V V V
 goType t = case t of
   I32 -> I32CPS
   TVar id -> TVarCPS id
-  Forall id body -> ArrowCPS [TypeEntry id] [ArrowCPS [] [goType body]]
-  Arrow t1 t2 -> ArrowCPS [] [goType t1, ArrowCPS [] [goType t2]]
+  Forall id body -> ArrowCPS [TypeEntry id] NotAssignedCap [ArrowCPS [] NotAssignedCap [goType body]]
+  Arrow t1 t2 -> ArrowCPS [] NotAssignedCap [goType t1, ArrowCPS [] NotAssignedCap [goType t2]]
