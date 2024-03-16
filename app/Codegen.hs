@@ -26,7 +26,7 @@ go stmts =
           ( \stmt (instr_pos, ops, renames) ->
               trace (prettyStmt stmt) $
                 let (id, stmt_ops_rev) = goStmt stmt
-                 in (instr_pos + length stmt_ops_rev, ops ++ reverse stmt_ops_rev, Map.insert id instr_pos renames)
+                 in (instr_pos + length stmt_ops_rev + 1, ops ++ reverse stmt_ops_rev, Map.insert id instr_pos renames)
           )
           (4, [], empty) -- 4 because of the function prepended in stmts_ops2
           (reverse stmts)
