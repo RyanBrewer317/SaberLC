@@ -21,18 +21,19 @@ import qualified Prelude as P
 
 go :: [Stmt U U] -> SLC [Word8]
 go stmts =
-  let (_, stmts_ops_rev, func_renames) =
+  let (_, stmts_ops, func_renames) =
         foldr
-          ( \stmt (instr_pos, ops_rev, renames) ->
+          ( \stmt (instr_pos, ops, renames) ->
               trace (prettyStmt stmt) $
                 let (id, stmt_ops_rev) = goStmt stmt
-                 in (instr_pos + length stmt_ops_rev, stmt_ops_rev ++ ops_rev, Map.insert id instr_pos renames)
+                 in (instr_pos + length stmt_ops_rev, ops ++ reverse stmt_ops_rev, Map.insert id instr_pos renames)
           )
-          (0, [], empty)
-          stmts
-   in let stmts_ops = NewRgnOp : GlobalFuncOp (-1) : CallOp : EndFunctionOp : reverse stmts_ops_rev
+          (4, [], empty) -- 4 because of the function prepended in stmts_ops2
+          (reverse stmts)
+   in let stmts_ops2 = [NewRgnOp, GlobalFuncOp (-1), CallOp, EndFunctionOp] ++ stmts_ops
        in return $
-            unsafePerformIO (writeFile "t.txt" (unlines (map show stmts_ops)) >> return P.id) $
+            unsafePerformIO (writeFile "t.txt" (unlines (map show stmts_ops2)) >> return P.id) $
+            trace (show func_renames) $
               (\bytes -> 0 : 0 : 0 : 0 : bytes) $
                 foldr
                   ( \op ops ->
@@ -44,7 +45,7 @@ go stmts =
                         _ -> opToBytes op ++ ops
                   )
                   []
-                  stmts_ops
+                  stmts_ops2
 
 data RT
 
