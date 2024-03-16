@@ -12,6 +12,7 @@ import Data.Bifunctor (second)
 import Data.List (intercalate)
 import Data.Void (Void, absurd)
 import Prelude hiding (id)
+import Debug.Trace (trace)
 
 type U = ()
 
@@ -341,3 +342,6 @@ run :: Id -> SLC a -> Either Error a
 run id (SLC f) = case f id of
   Fine _ x -> Right x
   Fail e -> Left e
+
+dbg :: (a -> String) -> a -> SLC a
+dbg out x = SLC $ \id -> Fine id $ trace (out x) x

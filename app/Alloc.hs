@@ -67,7 +67,7 @@ goVal v = case v of
     x <- fresh
     let xt = goType $ getValCPSType v
     let first_var = VarCPS x xt False
-    (end, decls2) <- getDecls vs2 0 first_var
+    (end, decls2) <- getDecls vs2 0 first_var xt
     return (end, concat decls ++ Malloc x (map getValCPSType vs2) : decls2)
   TAppCPS () t v2 ts -> do
     (v3, decls) <- goVal v2
@@ -76,13 +76,12 @@ goVal v = case v of
     (v3, decls) <- goVal v2
     return (PackCPS () (goType t) v3 (goType t2), decls)
 
-getDecls :: [ValCPS U U U V] -> Int -> ValCPS U U U V -> SLC (ValCPS U U U V, [Decl])
-getDecls [] _ v = return (v, [])
-getDecls (v : vs) i last_var = do
+getDecls :: [ValCPS U U U V] -> Int -> ValCPS U U U V -> TypeCPS U U U V -> SLC (ValCPS U U U V, [Decl])
+getDecls [] _ v _ = return (v, [])
+getDecls (v : vs) i last_var t = do
   x <- fresh
-  let xt = getValCPSType v
   let decl = Init x last_var i v
-  (end, rest) <- getDecls vs (i + 1) (VarCPS x xt False)
+  (end, rest) <- getDecls vs (i + 1) (VarCPS x t False) t
   return (end, decl : rest)
 
 goType :: TypeCPS U U V V -> TypeCPS U U U V
