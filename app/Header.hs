@@ -34,9 +34,9 @@ instance Pretty ExprParse where
         VarParse name -> name
         IntLitParse int -> show int
         LambdaParse name typeParse body -> "\\" ++ name ++ ": " ++ pretty typeParse ++ ". " ++ pretty body
-        AppParse f x -> pretty f ++ "(" ++ pretty x ++ ")"
+        AppParse f x -> "(" ++ pretty f ++ ")(" ++ pretty x ++ ")"
         TypeLambdaParse name body -> "/\\ " ++ name ++ ". " ++ pretty body
-        TypeAppParse expr typeParse -> pretty expr ++ "[" ++ pretty typeParse ++ "]"
+        TypeAppParse expr typeParse -> "(" ++ pretty expr ++ ")[" ++ pretty typeParse ++ "]"
 
 type Id = Int
 
@@ -45,6 +45,23 @@ data TypeTC
     | TypeVarTC Id
     | ForallTC Id TypeTC
     | FunctionTypeTC TypeTC TypeTC
+    deriving (Eq)
+
+eqTC :: TypeTC -> TypeTC -> Bool
+eqTC typeTC1 typeTC2 = case (typeTC1, typeTC2) of
+    (I32TC, I32TC) -> True
+    (TypeVarTC idNum1, TypeVarTC idNum2) -> idNum1 == idNum2
+    (ForallTC idNum1 body1, ForallTC idNum2 body2) -> eqTC body1 $ substitute idNum2 (TypeVarTC idNum1) body2
+    (FunctionTypeTC argType1 resultType1, FunctionTypeTC argType2 resultType2) -> eqTC argType1 argType2 && eqTC resultType1 resultType2
+    (_, _) -> False
+
+substitute :: Id -> TypeTC -> TypeTC -> TypeTC
+substitute idNum newType t = case t of
+    TypeVarTC idNum2 -> if idNum == idNum2 then newType else TypeVarTC idNum2
+    I32TC -> I32TC
+    ForallTC paramIdNum bodyTC -> ForallTC paramIdNum (substitute idNum newType bodyTC)
+    FunctionTypeTC paramType resultType -> FunctionTypeTC (substitute idNum newType paramType) (substitute idNum newType resultType)
+
 
 instance Pretty TypeTC where
     pretty typeTC = case typeTC of
@@ -53,14 +70,46 @@ instance Pretty TypeTC where
         ForallTC idNum body -> "forall " ++ "t" ++ show idNum ++ ". " ++ pretty body
         FunctionTypeTC argTypeTC returnTypeTC -> pretty argTypeTC ++ " -> " ++ pretty returnTypeTC
 
+data ExprTC
+    = VarTC TypeTC Id
+    | IntLitTC Int
+    | LambdaTC Id TypeTC ExprTC
+    | AppTC TypeTC ExprTC ExprTC
+    | TypeLambdaTC Id ExprTC
+    | TypeAppTC TypeTC ExprTC TypeTC
+
+instance Pretty ExprTC where
+    pretty exprTC = case exprTC of
+        VarTC _ idNum -> "x" ++ show idNum
+        IntLitTC int -> show int
+        LambdaTC var typeTC body -> "\\" ++ "x" ++ show var ++ ": " ++ pretty typeTC ++ ". " ++ pretty body
+        AppTC _ f x -> "(" ++ pretty f ++ ")(" ++ pretty x ++ ")"
+        TypeLambdaTC var body -> "/\\ " ++ "x" ++ show var ++ ". " ++ pretty body
+        TypeAppTC _ expr typeTC -> "(" ++ pretty expr ++ ")[" ++ pretty typeTC ++ "]"
+
+typeOfTC :: ExprTC -> TypeTC
+typeOfTC exprTC = case exprTC of
+    VarTC typeTC _ -> typeTC
+    IntLitTC _ -> I32TC
+    LambdaTC _ typeTC body -> FunctionTypeTC typeTC (typeOfTC body)
+    AppTC typeTC _ _ -> typeTC
+    TypeLambdaTC var body -> ForallTC var (typeOfTC body)
+    TypeAppTC typeTC _ _ -> typeTC
+
 data Error
   = ParseError String
   | UnknownIdentifier String
+  | TypeError TypeTC TypeTC
+  | CallingNonFunction TypeTC
+  | CallingNonForall TypeTC
 
 instance Pretty Error where
     pretty err = case err of
         ParseError msg -> "Parse error: " ++ msg
         UnknownIdentifier name -> "Unknown identifier: " ++ name
+        TypeError expected actual -> "Type error: expected " ++ pretty expected ++ ", got " ++ pretty actual
+        CallingNonFunction typeTC -> "Calling non-function: " ++ pretty typeTC
+        CallingNonForall typeTC -> "Calling non-forall: " ++ pretty typeTC
 
 data SLC_ a = Fine Id a | Fail Error
 

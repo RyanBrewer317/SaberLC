@@ -17,6 +17,7 @@ executable saberlc
     other-modules:
         Header
         Parser
+        Typechecker
 
     default-language: Haskell2010
     ghc-options:      -Wall
