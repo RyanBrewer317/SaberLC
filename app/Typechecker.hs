@@ -28,7 +28,7 @@ goExpr renames e = case e of
         argTC <- goExpr renames arg
         case typeOfTC funcTC of
             FunctionTypeTC paramType bodyType ->
-                if typeOfTC argTC == paramType then
+                if eqTC (typeOfTC argTC) paramType then
                     return $ AppTC bodyType funcTC argTC
                 else
                     throw $ TypeError paramType (typeOfTC argTC)
