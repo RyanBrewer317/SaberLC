@@ -10,8 +10,8 @@ import qualified Parser
 
 main :: IO ()
 main = case run 0 $ go "(\\x: i32. x)(3)" of
-    Left err -> putStrLn $ prettyError err
-    Right e -> putStrLn $ prettyExprParse e
+    Left err -> putStrLn $ pretty err
+    Right e -> putStrLn $ pretty e
 --  Right bytes -> do
 --      h_out <- openFile "bin.svm" WriteMode
 --      BIN.hPut h_out $ BIN.pack bytes
