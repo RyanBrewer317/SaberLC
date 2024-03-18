@@ -3,25 +3,25 @@
    License, v. 2.0. If a copy of the MPL was not distributed with this
    file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use void" #-}
 
 module Parser (go) where
 
-import Control.Monad (void)
-import Data.Foldable (foldl')
 import Header
 import Text.Parsec (alphaNum, char, digit, lower, many, many1, optionMaybe, parse, string, (<|>))
-import Text.Parsec.String
-import Prelude hiding (fail)
+import Text.Parsec.String (Parser)
+import Data.Foldable (foldl')
 
-go :: String -> SLC ExprSyntax
+go :: String -> SLC ExprParse
 go s = case parse parseExpr "INPUT" s of
-  Left err -> fail $ ParseError $ show err
+  Left err -> throw $ ParseError $ show err
   Right x -> return x
 
-parseI32 :: Parser TypeSyntax
+parseI32 :: Parser TypeParse
 parseI32 = do
   _ <- string "i32"
-  return I32Syntax
+  return I32Parse
 
 parseIdentifier :: Parser String
 parseIdentifier = do
@@ -29,25 +29,25 @@ parseIdentifier = do
   rest <- many (alphaNum <|> char '_')
   return (first : rest)
 
-parseTVar :: Parser TypeSyntax
-parseTVar = TVarSyntax <$> parseIdentifier
+parseTVar :: Parser TypeParse
+parseTVar = TypeVarParse <$> parseIdentifier
 
 ws1 :: Parser ()
-ws1 = void (many1 (char ' ' <|> char '\t' <|> char '\n'))
+ws1 = many1 (char ' ' <|> char '\t' <|> char '\n') >> return ()
 
 ws :: Parser ()
-ws = void (many (char ' ' <|> char '\t' <|> char '\n'))
+ws = many (char ' ' <|> char '\t' <|> char '\n') >> return ()
 
-parseForall :: Parser TypeSyntax
+parseForall :: Parser TypeParse
 parseForall = do
   _ <- string "forall"
   ws1
   x <- parseIdentifier
   ws
   _ <- char '.'
-  ForallSyntax x <$> parseType
+  ForallParse x <$> parseType
 
-parseType :: Parser TypeSyntax
+parseType :: Parser TypeParse
 parseType = do
   ws
   t <- parseForall <|> parseI32 <|> parseTVar
@@ -55,13 +55,13 @@ parseType = do
   mb_arrow <- optionMaybe (string "->")
   t2 <-
     ( case mb_arrow of
-        Just _ -> ArrowSyntax t <$> parseType
+        Just _ -> FunctionTypeParse t <$> parseType
         Nothing -> return t
       )
   ws
   return t2
 
-parseLambda :: Parser ExprSyntax
+parseLambda :: Parser ExprParse
 parseLambda = do
   _ <- char '\\'
   ws
@@ -73,9 +73,9 @@ parseLambda = do
   ws
   _ <- char '.'
   ws
-  LambdaSyntax x t <$> parseExpr
+  LambdaParse x t <$> parseExpr
 
-parseTLambda :: Parser ExprSyntax
+parseTLambda :: Parser ExprParse
 parseTLambda = do
   _ <- string "/\\"
   ws
@@ -83,13 +83,13 @@ parseTLambda = do
   ws
   _ <- char '.'
   ws
-  TLambdaSyntax x <$> parseExpr
+  TypeLambdaParse x <$> parseExpr
 
-parseVar :: Parser ExprSyntax
-parseVar = VarSyntax <$> parseIdentifier
+parseVar :: Parser ExprParse
+parseVar = VarParse <$> parseIdentifier
 
-parseLit :: Parser ExprSyntax
-parseLit = LitSyntax . read <$> many1 digit
+parseLit :: Parser ExprParse
+parseLit = IntLitParse . read <$> many1 digit
 
 parenthetical :: Parser a -> Parser a
 parenthetical p = char '(' *> ws *> p <* ws <* char ')'
@@ -97,7 +97,7 @@ parenthetical p = char '(' *> ws *> p <* ws <* char ')'
 bracketed :: Parser a -> Parser a
 bracketed p = char '[' *> ws *> p <* ws <* char ']'
 
-parseExpr :: Parser ExprSyntax
+parseExpr :: Parser ExprParse
 parseExpr = do
   ws
   e <- parseLambda <|> parseTLambda <|> parenthetical parseExpr <|> parseVar <|> parseLit
@@ -107,5 +107,5 @@ parseExpr = do
   ws
   return e2
   where
-    f e (Left e2) = AppSyntax e e2
-    f e (Right t) = TAppSyntax e t
+    f e (Left e2) = AppParse e e2
+    f e (Right t) = TypeAppParse e t
