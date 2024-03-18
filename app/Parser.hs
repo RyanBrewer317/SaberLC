@@ -86,7 +86,7 @@ parseTLambda = do
   TypeLambdaParse x <$> parseExpr
 
 parseVar :: Parser ExprParse
-parseVar = VarParse <$> parseIdentifier
+parseVar = VarParse False <$> parseIdentifier
 
 parseLit :: Parser ExprParse
 parseLit = IntLitParse . read <$> many1 digit

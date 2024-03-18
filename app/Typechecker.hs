@@ -11,11 +11,11 @@ import qualified Data.Map as Map
 go :: ExprParse -> SLC ExprTC
 go = goExpr Map.empty
 
-goExpr :: Map.Map String (Id, TypeTC) -> ExprParse -> SLC ExprTC
+goExpr :: Map.Map String (Int, TypeTC) -> ExprParse -> SLC ExprTC
 goExpr renames e = case e of
-    VarParse name ->
+    VarParse isGlobal name ->
         case Map.lookup name renames of
-            Just (idNum, t) -> return $ VarTC t idNum
+            Just (idNum, t) -> return $ VarTC t isGlobal $ Local idNum
             Nothing -> throw $ UnknownIdentifier name
     IntLitParse i -> return $ IntLitTC i
     LambdaParse param paramType body -> do
@@ -45,11 +45,11 @@ goExpr renames e = case e of
                 return $ TypeAppTC (substitute paramIdNum argTC bodyTC) funcTC argTC
             t -> throw $ CallingNonForall t
 
-goType :: Map.Map String (Id, TypeTC) -> TypeParse -> SLC TypeTC
+goType :: Map.Map String (Int, TypeTC) -> TypeParse -> SLC TypeTC
 goType renames t = case t of
     TypeVarParse name ->
         case Map.lookup name renames of
-            Just (idNum, _) -> return $ TypeVarTC idNum
+            Just (idNum, _) -> return $ TypeVarTC $ Local idNum
             Nothing -> throw $ UnknownIdentifier name
     I32Parse -> return I32TC
     ForallParse param body -> do
