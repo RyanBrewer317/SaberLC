@@ -9,6 +9,7 @@ import Header
 import qualified Parser
 import qualified Typechecker
 import qualified CPS
+import qualified ClosureConversion
 import Control.Monad ((>=>))
 
 main :: IO ()
@@ -20,5 +21,5 @@ main = case run 0 $ go "(\\x: i32. x)(3)" of
 --      BIN.hPut h_out $ BIN.pack bytes
 --      hClose h_out
 
-go :: String -> SLC ExprCPS
-go = Parser.go >=> Typechecker.go >=> CPS.go
+go :: String -> SLC ExprCC
+go = Parser.go >=> Typechecker.go >=> CPS.go >=> ClosureConversion.go

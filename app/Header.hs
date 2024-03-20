@@ -144,6 +144,63 @@ instance Pretty ExprCPS where
         HaltCPS v -> "halt " ++ pretty v
         AppCPS valCPS argsCPS -> "(" ++ pretty valCPS ++ ")(" ++ intercalate ", " (map pretty argsCPS) ++ ")"
 
+data TypeCC
+    = TypeVarCC Ident
+    | I32CC
+    | ForallCC [Int] TypeCC
+    | FunctionTypeCC [TypeCC]
+    | TupleTypeCC [TypeCC]
+    | ExistialCC Int TypeCC
+
+instance Pretty TypeCC where
+    pretty typeCC = case typeCC of
+        TypeVarCC ident -> pretty ident
+        I32CC -> "i32"
+        ForallCC params body -> "forall " ++ intercalate ", " (map (("x"++).show) params) ++ ". " ++ pretty body
+        FunctionTypeCC argTypesCC -> "(" ++ intercalate ", " (map pretty argTypesCC) ++ ")->0"
+        TupleTypeCC argTypesCC -> "(" ++ intercalate ", " (map pretty argTypesCC) ++ ")"
+        ExistialCC idNum body -> "exists x" ++ show idNum ++ ". " ++ pretty body
+
+data ValCC
+    = VarCC TypeCC Bool Ident
+    | IntLitCC Int
+    | LambdaCC [(Int, TypeCC)] ExprCC
+    | TypeLambdaCC [Int] ValCC
+    | TypeAppCC TypeCC ValCC [TypeCC]
+    | TupleCC [ValCC]
+    | PackCC TypeCC ValCC TypeCC
+
+instance Pretty ValCC where
+    pretty valCC = case valCC of
+        VarCC _ _ ident -> pretty ident
+        IntLitCC int -> show int
+        LambdaCC params body -> "\\" ++ intercalate ", " (map (\(idNum, typeCC) -> "x" ++ show idNum ++ ": " ++ pretty typeCC) params) ++ ". " ++ pretty body
+        TypeLambdaCC params body -> "/\\" ++ intercalate ", " (map (("x"++).show) params) ++ ". " ++ pretty body
+        TypeAppCC _ expr typeCC -> "(" ++ pretty expr ++ ")[" ++ intercalate ", " (map pretty typeCC) ++ "]"
+        TupleCC valsCC -> "(" ++ intercalate ", " (map pretty valsCC) ++ ")"
+        PackCC type1 val type2 -> "pack(" ++ pretty val ++ ": " ++ pretty type1 ++ ") as " ++ pretty type2
+
+typeOfCPSVal :: ValCPS -> TypeCPS
+typeOfCPSVal valCPS = case valCPS of
+    VarCPS typeCPS _ _ -> typeCPS
+    IntLitCPS _ -> I32CPS
+    LambdaCPS params _ -> FunctionTypeCPS (map snd params)
+    TypeLambdaCPS params body -> ForallCPS (head params) (typeOfCPSVal body)
+    TypeAppCPS typeCPS _ _ -> typeCPS
+
+data ExprCC
+    = HaltCC ValCC
+    | AppCC ValCC [ValCC]
+    | ProjCC Int TypeCC ValCC Int ExprCC
+    | UnpackCC Int Int ValCC ExprCC
+
+instance Pretty ExprCC where
+    pretty exprCC = case exprCC of
+        HaltCC v -> "halt " ++ pretty v
+        AppCC valCC argsCC -> "(" ++ pretty valCC ++ ")(" ++ intercalate ", " (map pretty argsCC) ++ ")"
+        ProjCC idNum typeCC valCC i scope -> "let x" ++ show idNum ++ ": " ++ pretty typeCC ++ " = " ++ pretty valCC ++ "[" ++ show i ++ "] in " ++ pretty scope
+        UnpackCC idNum1 idNum2 valCC scope -> "let [x" ++ show idNum1 ++ ", x" ++ show idNum2 ++ "] = unpack " ++ pretty valCC ++ " in " ++ pretty scope
+
 data Error
   = ParseError String
   | UnknownIdentifier String
