@@ -11,7 +11,9 @@ go :: ExprTC -> SLC ExprCPS
 go e = do
     x <- fresh
     let t = goType $ typeOfTC e
-    goExpr e (LambdaCPS [(x, t)] $ HaltCPS $ VarCPS t False $ Local x)
+    e2 <- goExpr e (LambdaCPS [(x, t)] $ HaltCPS $ VarCPS t False $ Local x)
+    typecheckExpr e2
+    return e2
 
 goExpr :: ExprTC -> ValCPS -> SLC ExprCPS
 goExpr e k = case e of
@@ -23,7 +25,7 @@ goExpr e k = case e of
         body2 <- goExpr body $ VarCPS continuationType False $ Local continuationIdNum
         return $ AppCPS k [LambdaCPS [(idNum, goType argt), (continuationIdNum, continuationType)] body2]
     AppTC _t f arg -> do
-        x1 <- fresh 
+        x1 <- fresh
         x2 <- fresh
         continuation <-
             goExpr arg $
@@ -34,11 +36,11 @@ goExpr e k = case e of
         continuationIdNum <- fresh
         let continuationType = FunctionTypeCPS [goType $ typeOfTC body]
         body2 <- goExpr body $ VarCPS continuationType False $ Local continuationIdNum
-        return $ AppCPS k [TypeLambdaCPS [idNum] $ LambdaCPS [(continuationIdNum, continuationType)] body2]
+        return $ AppCPS k [TypeLambdaCPS idNum $ LambdaCPS [(continuationIdNum, continuationType)] body2]
     TypeAppTC t f typeArg -> do
         x <- fresh
         let xt = goType $ typeOfTC f
-        goExpr f $ LambdaCPS [(x, xt)] $ AppCPS (TypeAppCPS (goType t) (VarCPS xt False $ Local x) [goType typeArg]) [k]
+        goExpr f $ LambdaCPS [(x, xt)] $ AppCPS (TypeAppCPS (goType t) (VarCPS xt False $ Local x) $ goType typeArg) [k]
 
 goType :: TypeTC -> TypeCPS
 goType t = case t of
@@ -46,3 +48,57 @@ goType t = case t of
     I32TC -> I32CPS
     ForallTC idNum body -> ForallCPS idNum $ goType body
     FunctionTypeTC argt rett -> FunctionTypeCPS [goType argt, FunctionTypeCPS [goType rett]]
+
+subst :: Int -> TypeCPS -> TypeCPS -> TypeCPS
+subst idNum newt oldt = case oldt of
+    TypeVarCPS (Local i) | i == idNum -> newt
+    TypeVarCPS _ -> oldt
+    I32CPS -> oldt
+    ForallCPS idNum1 body -> ForallCPS idNum1 (subst idNum newt body)
+    FunctionTypeCPS argTypes -> FunctionTypeCPS (map (subst idNum newt) argTypes)
+
+typeEq :: TypeCPS -> TypeCPS -> Bool
+typeEq t1 t2 = case (t1, t2) of
+    (TypeVarCPS i1, TypeVarCPS i2) -> i1 == i2
+    (I32CPS, I32CPS) -> True
+    (ForallCPS idNum1 body1, ForallCPS idNum2 body2) -> typeEq body1 (subst idNum2 (TypeVarCPS $ Local idNum1) body2)
+    (FunctionTypeCPS argTypes1, FunctionTypeCPS argTypes2) -> all (uncurry typeEq) $ zip argTypes1 argTypes2
+    _ -> False
+
+typecheckExpr :: ExprCPS -> SLC ()
+typecheckExpr e = case e of
+    HaltCPS v -> do
+        vt <- typecheckVal v
+        if vt == I32CPS then
+            return ()
+        else
+            error "Type mismatch in halt expression in CPS pass"
+    AppCPS f as -> do
+        ft <- typecheckVal f
+        case ft of
+            FunctionTypeCPS argTypes ->
+                if length argTypes == length as && all (uncurry typeEq) (zip argTypes (map typeOfCPSVal as)) then
+                    return ()
+                else
+                    error "Type mismatch in function application in CPS pass"
+            _ -> error "app of nonfunction in CPS pass"
+
+typecheckVal :: ValCPS -> SLC TypeCPS
+typecheckVal v = case v of
+    VarCPS t _ _ -> return t
+    IntLitCPS _ -> return I32CPS
+    LambdaCPS params body -> do
+        typecheckExpr body
+        return $ FunctionTypeCPS $ map snd params
+    TypeLambdaCPS idNum body -> do
+        bodyt <- typecheckVal body
+        return $ ForallCPS idNum bodyt
+    TypeAppCPS t f typeArg -> do
+        ft <- typecheckVal f
+        case ft of
+            ForallCPS idNum body ->
+                if typeEq t (subst idNum typeArg body) then
+                    return t
+                else
+                    error "Type mismatch in type application in CPS pass"
+            _ -> error "Non-forall applied to type in CPS pass"

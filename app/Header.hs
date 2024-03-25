@@ -124,16 +124,16 @@ data ValCPS
     = VarCPS TypeCPS Bool Ident
     | IntLitCPS Int
     | LambdaCPS [(Int, TypeCPS)] ExprCPS
-    | TypeLambdaCPS [Int] ValCPS
-    | TypeAppCPS TypeCPS ValCPS [TypeCPS]
+    | TypeLambdaCPS Int ValCPS
+    | TypeAppCPS TypeCPS ValCPS TypeCPS
 
 instance Pretty ValCPS where
     pretty valCPS = case valCPS of
         VarCPS _ _ ident -> pretty ident
         IntLitCPS int -> show int
         LambdaCPS params body -> "\\" ++ intercalate ", " (map (\(idNum, typeCPS) -> "x" ++ show idNum ++ ": " ++ pretty typeCPS) params) ++ ". " ++ pretty body
-        TypeLambdaCPS params body -> "/\\ " ++ intercalate ", " (map (("x"++).show) params) ++ ". " ++ pretty body
-        TypeAppCPS _ expr typeCPS -> "(" ++ pretty expr ++ ")[" ++ intercalate ", " (map pretty typeCPS) ++ "]"
+        TypeLambdaCPS param body -> "/\\ x" ++ show param ++ ". " ++ pretty body
+        TypeAppCPS _ expr t -> "(" ++ pretty expr ++ ")[" ++ pretty t ++ "]"
 
 data ExprCPS
     = HaltCPS ValCPS
@@ -185,7 +185,7 @@ typeOfCPSVal valCPS = case valCPS of
     VarCPS typeCPS _ _ -> typeCPS
     IntLitCPS _ -> I32CPS
     LambdaCPS params _ -> FunctionTypeCPS (map snd params)
-    TypeLambdaCPS params body -> ForallCPS (head params) (typeOfCPSVal body)
+    TypeLambdaCPS param body -> ForallCPS param (typeOfCPSVal body)
     TypeAppCPS typeCPS _ _ -> typeCPS
 
 data ExprCC

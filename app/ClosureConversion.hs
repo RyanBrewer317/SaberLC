@@ -42,15 +42,15 @@ goVal v = case v of
         envIdNum <- fresh
         body2 <- goExpr body
         args2 <- ((envIdNum, envType) :) <$> mapM (\(x, t) -> goType t >>= \t2 -> return (x, t2)) params
-        let code = LambdaCC args2 $ foldr (\(i, (idNum, t)) e -> 
+        let code = LambdaCC args2 $ foldr (\(i, (idNum, t)) e ->
                     ProjCC idNum t (VarCC envType False $ Local envIdNum) i e
                 ) body2 $ zip [0 ..] functionFreeVars2
         let envVal = TupleCC $ map (\(x, t) -> VarCC t False $ Local x) functionFreeVars2
         functionType <- goType $ typeOfCPSVal v
         let codeWithTypes = if null functionFreeTypeVars then code else TypeAppCC codeType code (map (TypeVarCC . Local) functionFreeTypeVars)
         return $ PackCC envType (TupleCC [codeWithTypes, envVal]) functionType
-    TypeLambdaCPS params body -> TypeLambdaCC params <$> goVal body
-    TypeAppCPS t f typeArgs -> TypeAppCC <$> goType t <*> goVal f <*> mapM goType typeArgs
+    TypeLambdaCPS param body -> TypeLambdaCC [param] <$> goVal body
+    TypeAppCPS t f typeArgs -> TypeAppCC <$> goType t <*> goVal f <*> ((:[]) <$> goType typeArgs)
 
 goType :: TypeCPS -> SLC TypeCC
 goType t = case t of
@@ -86,8 +86,8 @@ ftvVal bound v = case v of
     VarCPS t _ _ -> ftvType bound t
     IntLitCPS _ -> []
     LambdaCPS args body -> concatMap (ftvType bound . snd) args ++ ftv bound body
-    TypeLambdaCPS params body -> ftvVal (params ++ bound) body
-    TypeAppCPS t f ts -> ftvType bound t ++ ftvVal bound f ++ concatMap (ftvType bound) ts
+    TypeLambdaCPS param body -> ftvVal (param : bound) body
+    TypeAppCPS t f arg -> ftvType bound t ++ ftvVal bound f ++ ftvType bound arg
 
 ftvType :: [Int] -> TypeCPS -> [Int]
 ftvType bound t = case t of
