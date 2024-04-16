@@ -4,7 +4,7 @@
    file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-module ClosureConversion where
+module ClosureConversion (go) where
 
 import Header
 
@@ -15,19 +15,18 @@ goExpr :: ExprCPS -> SLC ExprCC
 goExpr e = case e of
     HaltCPS v -> HaltCC <$> goVal v
     AppCPS f as -> do
-        gamma <- fresh
-        z <- fresh
-        zcode <- fresh
-        zenv <- fresh
-        f2 <- goVal f
-        let (ExistialCC _id (TupleTypeCC [tcode, TypeVarCC _])) = typeOfCCVal f2
-        let prodt = TupleTypeCC [tcode, TypeVarCC $ Local gamma]
+        tpl <- fresh
+        new_f <- fresh
+        env <- fresh
+        clos <- goVal f
+        let (ExistialCC hidden_t (TupleTypeCC [new_f_t, TypeVarCC _])) = typeOfCCVal clos
+        let prodt = TupleTypeCC [new_f_t, TypeVarCC $ Local hidden_t]
         as2 <- mapM goVal as
         return $
-            UnpackCC gamma z f2 $
-                ProjCC zcode tcode (VarCC prodt False (Local z)) 0 $
-                    ProjCC zenv (TypeVarCC $ Local gamma) (VarCC prodt False (Local z)) 1 $
-                        AppCC (VarCC tcode False (Local zcode)) (VarCC (TypeVarCC (Local gamma)) False (Local zenv) : as2)
+            UnpackCC hidden_t tpl clos $
+                ProjCC new_f new_f_t (VarCC prodt False (Local tpl)) 0 $
+                    ProjCC env (TypeVarCC $ Local hidden_t) (VarCC prodt False (Local tpl)) 1 $
+                        AppCC (VarCC new_f_t False (Local new_f)) (VarCC (TypeVarCC (Local hidden_t)) False (Local env) : as2)
 
 goVal :: ValCPS -> SLC ValCC
 goVal v = case v of

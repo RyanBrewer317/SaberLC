@@ -10,16 +10,18 @@ import qualified Parser
 import qualified Typechecker
 import qualified CPS
 import qualified ClosureConversion
+import qualified Hoist
 import Control.Monad ((>=>))
+import Data.List (intercalate)
 
 main :: IO ()
 main = case run 0 $ go "(\\x: i32. x)(3)" of
     Left err -> putStrLn $ pretty err
-    Right e -> putStrLn $ pretty e
+    Right stmts -> putStrLn $ intercalate "\n\n" $ map pretty stmts
 --  Right bytes -> do
 --      h_out <- openFile "bin.svm" WriteMode
 --      BIN.hPut h_out $ BIN.pack bytes
 --      hClose h_out
 
-go :: String -> SLC ExprCC
-go = Parser.go >=> Typechecker.go >=> CPS.go >=> ClosureConversion.go
+go :: String -> SLC [StmtH]
+go = Parser.go >=> Typechecker.go >=> CPS.go >=> ClosureConversion.go >=> Hoist.go

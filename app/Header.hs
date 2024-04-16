@@ -201,6 +201,60 @@ instance Pretty ExprCC where
         ProjCC idNum typeCC valCC i scope -> "let x" ++ show idNum ++ ": " ++ pretty typeCC ++ " = " ++ pretty valCC ++ "[" ++ show i ++ "] in " ++ pretty scope
         UnpackCC idNum1 idNum2 valCC scope -> "let [x" ++ show idNum1 ++ ", x" ++ show idNum2 ++ "] = unpack " ++ pretty valCC ++ " in " ++ pretty scope
 
+data TypeH 
+    = TypeVarH Ident
+    | I32H
+    | ForallH [Int] TypeH
+    | FunctionTypeH [TypeH]
+    | TupleTypeH [TypeH]
+    | ExistentialH Int TypeH
+
+instance Pretty TypeH where
+    pretty typeH = case typeH of
+        TypeVarH ident -> pretty ident
+        I32H -> "i32"
+        ForallH params body -> "forall " ++ intercalate ", " (map (("x"++).show) params) ++ ". " ++ pretty body
+        FunctionTypeH argTypesH -> "(" ++ intercalate ", " (map pretty argTypesH) ++ ")->0"
+        TupleTypeH argTypesH -> "(" ++ intercalate ", " (map pretty argTypesH) ++ ")"
+        ExistentialH idNum body -> "exists x" ++ show idNum ++ ". " ++ pretty body
+
+data ValH
+    = VarH TypeH Bool Ident
+    | IntLitH Int
+    | TypeLambdaH [Int] ValH
+    | TypeAppH TypeH ValH [TypeH]
+    | TupleH [ValH]
+    | PackH TypeH ValH TypeH
+
+instance Pretty ValH where
+    pretty valH = case valH of
+        VarH _ _ ident -> pretty ident
+        IntLitH int -> show int
+        TypeLambdaH params body -> "/\\" ++ intercalate ", " (map (("x"++).show) params) ++ ". " ++ pretty body
+        TypeAppH _ expr typeHs -> "(" ++ pretty expr ++ ")[" ++ intercalate ", " (map pretty typeHs) ++ "]"
+        TupleH valsH -> "(" ++ intercalate ", " (map pretty valsH) ++ ")"
+        PackH type1 val type2 -> "pack(" ++ pretty val ++ ": " ++ pretty type1 ++ ") as " ++ pretty type2
+
+data ExprH
+    = HaltH ValH
+    | AppH ValH [ValH]
+    | ProjH Int TypeH ValH Int ExprH
+    | UnpackH Int Int ValH ExprH
+
+instance Pretty ExprH where
+    pretty expr = case expr of
+        HaltH v -> "    halt " ++ pretty v
+        AppH f args -> "    " ++ pretty f ++ "(" ++ intercalate ", " (map pretty args) ++ ")"
+        ProjH idNum t tpl i scope -> "    let x" ++ show idNum ++ ": " ++ pretty t ++ " = " ++ pretty tpl ++ "[" ++ show i ++ "]\n" ++ pretty scope
+        UnpackH idNum1 idNum2 v scope -> "    let [x" ++ show idNum1 ++ ", x" ++ show idNum2 ++ "] = unpack " ++ pretty v ++ "\n" ++ pretty scope
+
+data StmtH
+    = FuncH Int [Int] [(Int, TypeH)] ExprH
+
+instance Pretty StmtH where
+    pretty stmt = case stmt of
+        FuncH idNum tvars params body -> "fn x" ++ show idNum ++ "[" ++ intercalate ", " (map (("x"++).show) tvars) ++ "](" ++ intercalate ", " (map (\(x, typeH) -> "x" ++ show x ++ ": " ++ pretty typeH) params) ++ ") {\n" ++ pretty body ++ "\n}"
+
 data Error
   = ParseError String
   | UnknownIdentifier String
