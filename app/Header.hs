@@ -159,7 +159,7 @@ instance Pretty TypeCC where
         ForallCC params body -> "forall " ++ intercalate ", " (map (("x"++).show) params) ++ ". " ++ pretty body
         FunctionTypeCC argTypesCC -> "(" ++ intercalate ", " (map pretty argTypesCC) ++ ")->0"
         TupleTypeCC argTypesCC -> "(" ++ intercalate ", " (map pretty argTypesCC) ++ ")"
-        ExistialCC idNum body -> "exists x" ++ show idNum ++ ". " ++ pretty body
+        ExistialCC idNum body -> "some x" ++ show idNum ++ ". " ++ pretty body
 
 data ValCC
     = VarCC TypeCC Bool Ident
@@ -178,7 +178,7 @@ instance Pretty ValCC where
         TypeLambdaCC params body -> "/\\" ++ intercalate ", " (map (("x"++).show) params) ++ ". " ++ pretty body
         TypeAppCC _ expr typeCC -> "(" ++ pretty expr ++ ")[" ++ intercalate ", " (map pretty typeCC) ++ "]"
         TupleCC valsCC -> "(" ++ intercalate ", " (map pretty valsCC) ++ ")"
-        PackCC type1 val type2 -> "pack(" ++ pretty val ++ ": " ++ pretty type1 ++ ") as " ++ pretty type2
+        PackCC type1 val type2 -> "pack " ++ pretty val ++ " hiding " ++ pretty type1 ++ " as " ++ pretty type2
 
 typeOfCPSVal :: ValCPS -> TypeCPS
 typeOfCPSVal valCPS = case valCPS of
@@ -199,7 +199,7 @@ instance Pretty ExprCC where
         HaltCC v -> "halt " ++ pretty v
         AppCC valCC argsCC -> "(" ++ pretty valCC ++ ")(" ++ intercalate ", " (map pretty argsCC) ++ ")"
         ProjCC idNum typeCC valCC i scope -> "let x" ++ show idNum ++ ": " ++ pretty typeCC ++ " = " ++ pretty valCC ++ "[" ++ show i ++ "] in " ++ pretty scope
-        UnpackCC idNum1 idNum2 valCC scope -> "let [x" ++ show idNum1 ++ ", x" ++ show idNum2 ++ "] = unpack " ++ pretty valCC ++ " in " ++ pretty scope
+        UnpackCC idNum1 idNum2 valCC scope -> "let [x" ++ show idNum1 ++ ", x" ++ show idNum2 ++ "] = unpack(" ++ pretty valCC ++ ") in " ++ pretty scope
 
 data TypeH 
     = TypeVarH Ident
@@ -216,7 +216,7 @@ instance Pretty TypeH where
         ForallH params body -> "forall " ++ intercalate ", " (map (("x"++).show) params) ++ ". " ++ pretty body
         FunctionTypeH argTypesH -> "(" ++ intercalate ", " (map pretty argTypesH) ++ ")->0"
         TupleTypeH argTypesH -> "(" ++ intercalate ", " (map pretty argTypesH) ++ ")"
-        ExistentialH idNum body -> "exists x" ++ show idNum ++ ". " ++ pretty body
+        ExistentialH idNum body -> "some x" ++ show idNum ++ ". " ++ pretty body
 
 data ValH
     = VarH TypeH Bool Ident
@@ -233,7 +233,7 @@ instance Pretty ValH where
         TypeLambdaH params body -> "/\\" ++ intercalate ", " (map (("x"++).show) params) ++ ". " ++ pretty body
         TypeAppH _ expr typeHs -> "(" ++ pretty expr ++ ")[" ++ intercalate ", " (map pretty typeHs) ++ "]"
         TupleH valsH -> "(" ++ intercalate ", " (map pretty valsH) ++ ")"
-        PackH type1 val type2 -> "pack(" ++ pretty val ++ ": " ++ pretty type1 ++ ") as " ++ pretty type2
+        PackH type1 val type2 -> "pack " ++ pretty val ++ " hiding " ++ pretty type1 ++ " as " ++ pretty type2
 
 data ExprH
     = HaltH ValH
@@ -246,7 +246,7 @@ instance Pretty ExprH where
         HaltH v -> "    halt " ++ pretty v
         AppH f args -> "    " ++ pretty f ++ "(" ++ intercalate ", " (map pretty args) ++ ")"
         ProjH idNum t tpl i scope -> "    let x" ++ show idNum ++ ": " ++ pretty t ++ " = " ++ pretty tpl ++ "[" ++ show i ++ "]\n" ++ pretty scope
-        UnpackH idNum1 idNum2 v scope -> "    let [x" ++ show idNum1 ++ ", x" ++ show idNum2 ++ "] = unpack " ++ pretty v ++ "\n" ++ pretty scope
+        UnpackH idNum1 idNum2 v scope -> "    let [x" ++ show idNum1 ++ ", x" ++ show idNum2 ++ "] = unpack(" ++ pretty v ++ ")\n" ++ pretty scope
 
 data StmtH
     = FuncH Int [Int] [(Int, TypeH)] ExprH
@@ -254,6 +254,65 @@ data StmtH
 instance Pretty StmtH where
     pretty stmt = case stmt of
         FuncH idNum tvars params body -> "fn x" ++ show idNum ++ "[" ++ intercalate ", " (map (("x"++).show) tvars) ++ "](" ++ intercalate ", " (map (\(x, typeH) -> "x" ++ show x ++ ": " ++ pretty typeH) params) ++ ") {\n" ++ pretty body ++ "\n}"
+
+data TypeA
+    = TypeVarA Ident
+    | I32A
+    | ForallA [Int] TypeA
+    | FunctionTypeA [TypeA]
+    | TupleTypeA [TypeA]
+    | ExistentialA Int TypeA
+
+instance Pretty TypeA where
+    pretty t = case t of
+        TypeVarA ident -> pretty ident
+        I32A -> "i32"
+        ForallA params body -> "forall " ++ intercalate ", " (map (("x"++).show) params) ++ ". " ++ pretty body
+        FunctionTypeA argTypesH -> "(" ++ intercalate ", " (map pretty argTypesH) ++ ")->0"
+        TupleTypeA argTypesH -> "(" ++ intercalate ", " (map pretty argTypesH) ++ ")"
+        ExistentialA idNum body -> "some x" ++ show idNum ++ ". " ++ pretty body
+
+data ValA
+    = VarA TypeA Bool Ident
+    | IntLitA Int
+    | TypeLambdaA [Int] ValA
+    | TypeAppA TypeA ValA [TypeA]
+    | TupleA [ValA]
+    | PackA TypeA ValA TypeA
+
+instance Pretty ValA where
+    pretty v = case v of
+        VarA _ _ ident -> pretty ident
+        IntLitA int -> show int
+        TypeLambdaA params body -> "/\\" ++ intercalate ", " (map (("x"++).show) params) ++ ". " ++ pretty body
+        TypeAppA _ expr typeHs -> "(" ++ pretty expr ++ ")[" ++ intercalate ", " (map pretty typeHs) ++ "]"
+        TupleA valsH -> "(" ++ intercalate ", " (map pretty valsH) ++ ")"
+        PackA type1 val type2 -> "pack " ++ pretty val ++ " hiding " ++ pretty type1 ++ " as " ++ pretty type2
+
+data ExprA
+    = HaltA ValA
+    | AppA ValA [ValA]
+    | ProjA Int TypeA ValA Int ExprA
+    | UnpackA Int Int ValA ExprA
+    | MallocA Int [TypeA] ExprA
+    | InitA Int ValA Int ValA ExprA
+
+instance Pretty ExprA where
+    pretty expr = case expr of
+        HaltA v -> "    halt " ++ pretty v
+        AppA f args -> "    " ++ pretty f ++ "(" ++ intercalate ", " (map pretty args) ++ ")"
+        ProjA idNum t tpl i scope -> "    let x" ++ show idNum ++ ": " ++ pretty t ++ " = " ++ pretty tpl ++ "[" ++ show i ++ "]\n" ++ pretty scope
+        UnpackA idNum1 idNum2 v scope -> "    let [x" ++ show idNum1 ++ ", x" ++ show idNum2 ++ "] = unpack(" ++ pretty v ++ ")\n" ++ pretty scope
+        MallocA idNum types scope -> "    let x" ++ show idNum ++ ": (" ++ intercalate ", " (map pretty types) ++ ") = malloc (" ++ intercalate ", " (map pretty types) ++ ")\n" ++ pretty scope
+        InitA idNum tpl i v scope -> "    let x" ++ show idNum ++ " = " ++ pretty tpl ++ "[" ++ show i ++ "] <- " ++ pretty v ++ "\n" ++ pretty scope
+
+data StmtA
+    = FuncA Int [Int] [(Int, TypeA)] ExprA
+
+instance Pretty StmtA where
+    pretty stmt = case stmt of
+        FuncA idNum tvars params body -> "fn x" ++ show idNum ++ "[" ++ intercalate ", " (map (("x"++).show) tvars) ++ "](" ++ intercalate ", " (map (\(x, typeH) -> "x" ++ show x ++ ": " ++ pretty typeH) params) ++ ") {\n" ++ pretty body ++ "\n}"
+
 
 data Error
   = ParseError String

@@ -21,6 +21,7 @@ executable saberlc
         CPS
         ClosureConversion
         Hoist
+        Alloc
 
     default-language: Haskell2010
     ghc-options:      -Wall
