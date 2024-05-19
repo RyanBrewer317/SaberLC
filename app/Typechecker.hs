@@ -15,14 +15,14 @@ goExpr :: Map.Map String (Int, TypeTC) -> ExprParse -> SLC ExprTC
 goExpr renames e = case e of
     VarParse isGlobal name ->
         case Map.lookup name renames of
-            Just (idNum, t) -> return $ VarTC t isGlobal $ Local idNum
+            Just (idNum, t) -> return $ VarTC t isGlobal $ Local idNum name
             Nothing -> throw $ UnknownIdentifier name
     IntLitParse i -> return $ IntLitTC i
     LambdaParse param paramType body -> do
         paramIdNum <- fresh
         paramTypeTC <- goType renames paramType
         bodyTC <- goExpr (Map.insert param (paramIdNum, paramTypeTC) renames) body
-        return $ LambdaTC paramIdNum paramTypeTC bodyTC
+        return $ LambdaTC paramIdNum param paramTypeTC bodyTC
     AppParse func arg -> do
         funcTC <- goExpr renames func
         argTC <- goExpr renames arg
@@ -36,12 +36,12 @@ goExpr renames e = case e of
     TypeLambdaParse param body -> do
         paramIdNum <- fresh
         bodyTC <- goExpr (Map.insert param (paramIdNum, undefined) renames) body
-        return $ TypeLambdaTC paramIdNum bodyTC
+        return $ TypeLambdaTC paramIdNum param bodyTC
     TypeAppParse func arg -> do
         funcTC <- goExpr renames func
         argTC <- goType renames arg
         case typeOfTC funcTC of
-            ForallTC paramIdNum bodyTC ->
+            ForallTC paramIdNum _ bodyTC ->
                 return $ TypeAppTC (substitute paramIdNum argTC bodyTC) funcTC argTC
             t -> throw $ CallingNonForall t
 
@@ -49,13 +49,13 @@ goType :: Map.Map String (Int, TypeTC) -> TypeParse -> SLC TypeTC
 goType renames t = case t of
     TypeVarParse name ->
         case Map.lookup name renames of
-            Just (idNum, _) -> return $ TypeVarTC $ Local idNum
+            Just (idNum, _) -> return $ TypeVarTC $ Local idNum name
             Nothing -> throw $ UnknownIdentifier name
     I32Parse -> return I32TC
     ForallParse param body -> do
         paramIdNum <- fresh
         bodyTC <- goType (Map.insert param (paramIdNum, undefined) renames) body
-        return $ ForallTC paramIdNum bodyTC
+        return $ ForallTC paramIdNum param bodyTC
     FunctionTypeParse paramType resultType -> do
         paramTypeTC <- goType renames paramType
         resultTypeTC <- goType renames resultType

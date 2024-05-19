@@ -22,6 +22,7 @@ executable saberlc
         ClosureConversion
         Hoist
         Alloc
+        Regions
 
     default-language: Haskell2010
     ghc-options:      -Wall

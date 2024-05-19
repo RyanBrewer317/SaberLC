@@ -11,13 +11,13 @@ import Data.Bifunctor (second)
 import Header
 import Prelude hiding (id)
 
-data Decl = Malloc Int [TypeA] | Init Int ValA Int ValA
+data Decl = Malloc Int String [TypeA] | Init Int String ValA Int ValA
 
 go :: [StmtH] -> SLC [StmtA]
 go = mapM goStmt
 
 goStmt :: StmtH -> SLC StmtA
-goStmt (FuncH id tvars params body) = FuncA id tvars (map (second goType) params) <$> goExpr body
+goStmt (FuncH id s tvars params body) = FuncA id s tvars (map (second goType) params) <$> goExpr body
 
 goExpr :: ExprH -> SLC ExprA
 goExpr e = case e of
@@ -28,22 +28,22 @@ goExpr e = case e of
     (f2, decls) <- goVal f
     (as2, decls2) <- mapAndUnzipM goVal as
     return $ putDecls (decls ++ concat decls2) $ AppA f2 as2
-  ProjH x t tpl i scope -> do
+  ProjH x s t tpl i scope -> do
     (tpl2, decls) <- goVal tpl
     scope2 <- goExpr scope
-    return $ putDecls decls $ ProjA x (goType t) tpl2 i scope2
-  UnpackH t x v scope -> do
+    return $ putDecls decls $ ProjA x s (goType t) tpl2 i scope2
+  UnpackH t s1 x s2 v scope -> do
     (v2, decls) <- goVal v
     scope2 <- goExpr scope
-    return $ putDecls decls $ UnpackA t x v2 scope2
+    return $ putDecls decls $ UnpackA t s1 x s2 v2 scope2
 
 putDecls :: [Decl] -> ExprA -> ExprA
 putDecls decls e =
   foldr
     ( \d e2 ->
         case d of
-          Malloc x ts -> MallocA x ts e2
-          Init x tpl i v2 -> InitA x tpl i v2 e2
+          Malloc x s ts -> MallocA x s ts e2
+          Init x s tpl i v2 -> InitA x s tpl i v2 e2
     )
     e
     decls
@@ -56,9 +56,9 @@ goVal v = case v of
     (vs2, decls) <- mapAndUnzipM goVal vs
     x <- fresh
     let xt = goType $ typeOfHVal v
-    let first_var = VarA xt False $ Local x
-    (end, decls2) <- getDecls vs2 0 first_var xt
-    return (end, concat decls ++ Malloc x (map typeOfAVal vs2) : decls2)
+    let first_var = VarA xt False $ Local x "tpl"
+    (end, decls2) <- getDecls "tpl" vs2 0 first_var xt
+    return (end, concat decls ++ Malloc x "tpl" (map typeOfAVal vs2) : decls2)
   TypeLambdaH xs body -> do
     (body2, decls) <- goVal body
     return (TypeLambdaA xs body2, decls)
@@ -69,12 +69,12 @@ goVal v = case v of
     (v3, decls) <- goVal v2
     return (PackA (goType t) v3 (goType t2), decls)
 
-getDecls :: [ValA] -> Int -> ValA -> TypeA -> SLC (ValA, [Decl])
-getDecls [] _ v _ = return (v, [])
-getDecls (v : vs) i last_var t = do
+getDecls :: String -> [ValA] -> Int -> ValA -> TypeA -> SLC (ValA, [Decl])
+getDecls _ [] _ v _ = return (v, [])
+getDecls s (v : vs) i last_var t = do
   x <- fresh
-  let decl = Init x last_var i v
-  (end, rest) <- getDecls vs (i + 1) (VarA t False $ Local x) t
+  let decl = Init x s last_var i v
+  (end, rest) <- getDecls s vs (i + 1) (VarA t False $ Local x s) t
   return (end, decl : rest)
 
 goType :: TypeH -> TypeA
@@ -84,7 +84,7 @@ goType t = case t of
   ForallH xs body -> ForallA xs (goType body)
   FunctionTypeH ts -> FunctionTypeA (map goType ts)
   TupleTypeH xs -> TupleTypeA (map goType xs)
-  ExistentialH x t2 -> ExistentialA x (goType t2)
+  ExistentialH x s t2 -> ExistentialA x s (goType t2)
 
 typeOfHVal :: ValH -> TypeH
 typeOfHVal v = case v of
@@ -99,7 +99,6 @@ typeOfAVal :: ValA -> TypeA
 typeOfAVal v = case v of
     IntLitA _ -> I32A
     VarA t _ _ -> t
-    TupleA vs -> TupleTypeA (map typeOfAVal vs)
     TypeLambdaA xs body -> ForallA xs (typeOfAVal body)
     TypeAppA t _ _ -> t
     PackA _ _ t2 -> t2

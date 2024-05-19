@@ -11,20 +11,20 @@ import Data.Bifunctor (bimap, first, second)
 import Header
 
 go :: ExprCC -> SLC [StmtH]
-go = goExpr >=> \(e, stmts) -> return $ FuncH (-1) [] [] e : stmts
+go = goExpr >=> \(e, stmts) -> return $ FuncH (-1) "main" [] [] e : stmts
 
 goExpr :: ExprCC -> SLC (ExprH, [StmtH])
 goExpr e = case e of
   HaltCC v -> first HaltH <$> goVal v
   AppCC f as -> goVal f >>= \(f2, stmts) -> bimap (AppH f2) ((stmts ++) . concat) <$> mapAndUnzipM goVal as
-  ProjCC x t tpl i scope -> do
+  ProjCC x s t tpl i scope -> do
     (v2, stmts) <- goVal tpl
     (scope2, stmst2) <- goExpr scope
-    return (ProjH x (goType t) v2 i scope2, stmts ++ stmst2)
-  UnpackCC x y v scope -> do
+    return (ProjH x s (goType t) v2 i scope2, stmts ++ stmst2)
+  UnpackCC x s1 y s2 v scope -> do
     (v2, stmts) <- goVal v
     (scope2, stmts2) <- goExpr scope
-    return (UnpackH x y v2 scope2, stmts ++ stmts2)
+    return (UnpackH x s1 y s2 v2 scope2, stmts ++ stmts2)
 
 goVal :: ValCC -> SLC (ValH, [StmtH])
 goVal v = case v of
@@ -33,7 +33,7 @@ goVal v = case v of
   f@(LambdaCC xs e) -> do
     x <- fresh
     (e2, stmts) <- goExpr e
-    return (VarH (goType $ typeOfCCVal f) True $ Local x, FuncH x [] (map (second goType) xs) e2 : stmts)
+    return (VarH (goType $ typeOfCCVal f) True $ Local x "foo", FuncH x "foo" [] (map (second goType) xs) e2 : stmts)
   TupleCC xs -> bimap TupleH concat <$> mapAndUnzipM (goVal >=> (\ (x2, stmts) -> return (x2, stmts))) xs
   TypeLambdaCC xs body -> do
     (body2, stmts) <- goVal body
@@ -48,13 +48,13 @@ goType t = case t of
   ForallCC x t2 -> ForallH x (goType t2)
   FunctionTypeCC xs -> FunctionTypeH (map goType xs)
   TupleTypeCC ts -> TupleTypeH (map goType ts)
-  ExistialCC x t2 -> ExistentialH x (goType t2)
+  ExistialCC x s t2 -> ExistentialH x s (goType t2)
 
 typeOfCCVal :: ValCC -> TypeCC
 typeOfCCVal v = case v of
     IntLitCC _ -> I32CC
     VarCC t _ _ -> t
-    LambdaCC xs _ -> FunctionTypeCC $ map snd xs
+    LambdaCC xs _ -> FunctionTypeCC $ map (\(_,_,t)->t) xs
     TupleCC xs -> TupleTypeCC $ map typeOfCCVal xs
     TypeLambdaCC xs body -> ForallCC xs (typeOfCCVal body)
     TypeAppCC t _ _ -> t
