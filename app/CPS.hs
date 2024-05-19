@@ -11,7 +11,7 @@ go :: ExprTC -> SLC ExprCPS
 go e = do
     x <- fresh
     let t = goType $ typeOfTC e
-    e2 <- goExpr e (LambdaCPS [(x, "B", t)] $ HaltCPS $ VarCPS t False $ Local x "B")
+    e2 <- goExpr e (LambdaCPS [(x, "x", t)] $ HaltCPS $ VarCPS t False $ Local x "x")
     typecheckExpr e2
     return e2
 
@@ -29,9 +29,9 @@ goExpr e k = case e of
         x2 <- fresh
         continuation <-
             goExpr arg $
-                LambdaCPS [(x2, "BLA", goType $ typeOfTC arg)] $
-                    AppCPS (VarCPS (goType $ typeOfTC f) False $ Local x1 "BL") [VarCPS (goType $ typeOfTC arg) False $ Local x2 "BLA", k]
-        goExpr f $ LambdaCPS [(x1, "BL", goType $ typeOfTC f)] continuation
+                LambdaCPS [(x2, "x", goType $ typeOfTC arg)] $
+                    AppCPS (VarCPS (goType $ typeOfTC f) False $ Local x1 "f") [VarCPS (goType $ typeOfTC arg) False $ Local x2 "x", k]
+        goExpr f $ LambdaCPS [(x1, "f", goType $ typeOfTC f)] continuation
     TypeLambdaTC idNum s body -> do
         continuationIdNum <- fresh
         let continuationType = FunctionTypeCPS [goType $ typeOfTC body]
@@ -40,7 +40,7 @@ goExpr e k = case e of
     TypeAppTC t f typeArg -> do
         x <- fresh
         let xt = goType $ typeOfTC f
-        goExpr f $ LambdaCPS [(x, "BLAH", xt)] $ AppCPS (TypeAppCPS (goType t) (VarCPS xt False $ Local x "BLAH") $ goType typeArg) [k]
+        goExpr f $ LambdaCPS [(x, "f", xt)] $ AppCPS (TypeAppCPS (goType t) (VarCPS xt False $ Local x "f") $ goType typeArg) [k]
 
 goType :: TypeTC -> TypeCPS
 goType t = case t of
