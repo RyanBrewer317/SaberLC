@@ -1,0 +1,510 @@
+5
+RgnOp
+CTGetOp (Pos {posToInt = 0})
+HandleOp
+FuncOp 1
+EndOp
+LcedOp
+RgnOp
+CTGetOp (Pos {posToInt = 0})
+HandleOp
+CTGetOp (Pos {posToInt = 0})
+TupleOp 0
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+I32Op
+CTGetOp (Pos {posToInt = 5})
+CTGetOp (Pos {posToInt = 3})
+HandleOp
+FuncOp 4
+EndOp
+TupleOp 2
+EndOp
+FuncOp 3
+EndOp
+LcedOp
+RgnOp
+CTGetOp (Pos {posToInt = 0})
+HandleOp
+CTGetOp (Pos {posToInt = 0})
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 2})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+I32Op
+CTGetOp (Pos {posToInt = 5})
+CTGetOp (Pos {posToInt = 3})
+HandleOp
+FuncOp 4
+EndOp
+TupleOp 2
+EndOp
+TupleOp 1
+I32Op
+FuncOp 3
+EndOp
+LcedOp
+RgnOp
+CTGetOp (Pos {posToInt = 0})
+HandleOp
+CTGetOp (Pos {posToInt = 0})
+TupleOp 0
+I32Op
+FuncOp 3
+EndOp
+LcedOp
+RgnOp
+CTGetOp (Pos {posToInt = 0})
+HandleOp
+CTGetOp (Pos {posToInt = 0})
+TupleOp 0
+I32Op
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+FuncOp 4
+EndOp
+LcedOp
+NewRgnOp 4096
+GlobalFuncOp (-1)
+CallOp
+GetOp (Pos {posToInt = 0})
+CTGetOp (Pos {posToInt = 0})
+TupleOp 0
+MallocOp
+GetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 0})
+CTGetOp (Pos {posToInt = 1})
+TupleOp 0
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+I32Op
+CTGetOp (Pos {posToInt = 5})
+CTGetOp (Pos {posToInt = 3})
+HandleOp
+FuncOp 4
+EndOp
+TupleOp 2
+EndOp
+CTGetOp (Pos {posToInt = 1})
+TupleOp 0
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+MallocOp
+GetOp (Pos {posToInt = 0})
+GlobalFuncOp 39
+InitOp 0
+GetOp (Pos {posToInt = 0})
+GetOp (Pos {posToInt = 3})
+InitOp 1
+GetOp (Pos {posToInt = 0})
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+I32Op
+CTGetOp (Pos {posToInt = 5})
+CTGetOp (Pos {posToInt = 3})
+HandleOp
+FuncOp 4
+EndOp
+TupleOp 2
+EndOp
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+CTGetOp (Pos {posToInt = 1})
+TupleOp 0
+PackOp
+UnpackOp
+GetOp (Pos {posToInt = 0})
+ProjOp 0
+GetOp (Pos {posToInt = 1})
+ProjOp 1
+GetOp (Pos {posToInt = 7})
+CTGetOp (Pos {posToInt = 0})
+TupleOp 0
+MallocOp
+GetOp (Pos {posToInt = 8})
+CTGetOp (Pos {posToInt = 0})
+CTGetOp (Pos {posToInt = 1})
+TupleOp 0
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+I32Op
+CTGetOp (Pos {posToInt = 2})
+TupleOp 0
+CTGetOp (Pos {posToInt = 3})
+HandleOp
+FuncOp 4
+EndOp
+TupleOp 2
+MallocOp
+GetOp (Pos {posToInt = 0})
+GlobalFuncOp 42
+InitOp 0
+GetOp (Pos {posToInt = 0})
+GetOp (Pos {posToInt = 3})
+InitOp 1
+GetOp (Pos {posToInt = 0})
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+I32Op
+CTGetOp (Pos {posToInt = 5})
+CTGetOp (Pos {posToInt = 3})
+HandleOp
+FuncOp 4
+EndOp
+TupleOp 2
+EndOp
+CTGetOp (Pos {posToInt = 1})
+TupleOp 0
+PackOp
+GetOp (Pos {posToInt = 5})
+GetOp (Pos {posToInt = 13})
+CTGetOp (Pos {posToInt = 0})
+GetOp (Pos {posToInt = 8})
+AppOp
+CallOp
+GetOp (Pos {posToInt = 0})
+CTGetOp (Pos {posToInt = 0})
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 2})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+I32Op
+CTGetOp (Pos {posToInt = 5})
+CTGetOp (Pos {posToInt = 3})
+HandleOp
+FuncOp 4
+EndOp
+TupleOp 2
+EndOp
+TupleOp 1
+MallocOp
+GetOp (Pos {posToInt = 0})
+GetOp (Pos {posToInt = 4})
+InitOp 0
+GetOp (Pos {posToInt = 2})
+CTGetOp (Pos {posToInt = 0})
+CTGetOp (Pos {posToInt = 1})
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 3})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+I32Op
+CTGetOp (Pos {posToInt = 5})
+CTGetOp (Pos {posToInt = 3})
+HandleOp
+FuncOp 4
+EndOp
+TupleOp 2
+EndOp
+TupleOp 1
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 1})
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 3})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+I32Op
+CTGetOp (Pos {posToInt = 5})
+CTGetOp (Pos {posToInt = 3})
+HandleOp
+FuncOp 4
+EndOp
+TupleOp 2
+EndOp
+TupleOp 1
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+MallocOp
+GetOp (Pos {posToInt = 0})
+GlobalFuncOp 40
+InitOp 0
+GetOp (Pos {posToInt = 0})
+GetOp (Pos {posToInt = 3})
+InitOp 1
+GetOp (Pos {posToInt = 0})
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+CTGetOp (Pos {posToInt = 1})
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 3})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+I32Op
+CTGetOp (Pos {posToInt = 5})
+CTGetOp (Pos {posToInt = 3})
+HandleOp
+FuncOp 4
+EndOp
+TupleOp 2
+EndOp
+TupleOp 1
+PackOp
+UnpackOp
+GetOp (Pos {posToInt = 0})
+ProjOp 0
+GetOp (Pos {posToInt = 1})
+ProjOp 1
+LitOp 3
+GetOp (Pos {posToInt = 1})
+GetOp (Pos {posToInt = 10})
+CTGetOp (Pos {posToInt = 0})
+GetOp (Pos {posToInt = 4})
+AppOp
+CallOp
+GetOp (Pos {posToInt = 1})
+ProjOp 0
+GetOp (Pos {posToInt = 0})
+UnpackOp
+GetOp (Pos {posToInt = 0})
+ProjOp 0
+GetOp (Pos {posToInt = 1})
+ProjOp 1
+GetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 0})
+TupleOp 0
+MallocOp
+GetOp (Pos {posToInt = 5})
+CTGetOp (Pos {posToInt = 0})
+CTGetOp (Pos {posToInt = 1})
+TupleOp 0
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 1})
+TupleOp 0
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+MallocOp
+GetOp (Pos {posToInt = 0})
+GlobalFuncOp 41
+InitOp 0
+GetOp (Pos {posToInt = 0})
+GetOp (Pos {posToInt = 3})
+InitOp 1
+GetOp (Pos {posToInt = 0})
+SizeOp 16
+SomeOp
+CTGetOp (Pos {posToInt = 1})
+CTGetOp (Pos {posToInt = 1})
+RgnOp
+I32Op
+CTGetOp (Pos {posToInt = 4})
+CTGetOp (Pos {posToInt = 2})
+HandleOp
+FuncOp 3
+EndOp
+TupleOp 2
+EndOp
+CTGetOp (Pos {posToInt = 1})
+TupleOp 0
+PackOp
+GetOp (Pos {posToInt = 11})
+GetOp (Pos {posToInt = 6})
+GetOp (Pos {posToInt = 11})
+CTGetOp (Pos {posToInt = 0})
+GetOp (Pos {posToInt = 9})
+AppOp
+CallOp
+GetOp (Pos {posToInt = 2})
+HaltOp 0
+GetOp (Pos {posToInt = 3})
+UnpackOp
+GetOp (Pos {posToInt = 0})
+ProjOp 0
+GetOp (Pos {posToInt = 1})
+ProjOp 1
+GetOp (Pos {posToInt = 5})
+GetOp (Pos {posToInt = 1})
+GetOp (Pos {posToInt = 5})
+CTGetOp (Pos {posToInt = 0})
+GetOp (Pos {posToInt = 4})
+AppOp
+CallOp
