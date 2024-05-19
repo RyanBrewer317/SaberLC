@@ -21,7 +21,7 @@ goStmt (FuncA x s tvars params body) = do
   let rh_ident = Local rh "h"
   params2 <- mapM (\(a, s2, b) -> (a,s2,) <$> goType r_ident rh_ident b) params
   body2 <- goExpr r_ident rh_ident body
-  return $ FuncR x s ((r, "r") : tvars) ((rh, "h", HandleTypeR $ Local r "r") : params2) body2
+  return $ FuncR x s ((r, True, "r") : map (\(a,b)->(a,False,b)) tvars) ((rh, "h", HandleTypeR $ Local r "r") : params2) body2
 
 goExpr :: Ident -> Ident -> ExprA -> SLC ExprR
 goExpr r rh e = case e of

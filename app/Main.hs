@@ -13,17 +13,19 @@ import qualified ClosureConversion
 import qualified Hoist
 import qualified Alloc
 import qualified Regions
+import qualified Codegen
 import Control.Monad ((>=>))
-import Data.List (intercalate)
+import qualified Data.ByteString as BIN
+import System.IO
+import Data.Binary (Word8)
 
 main :: IO ()
 main = case run 0 $ go "(\\x: i32. x)(3)" of
     Left err -> putStrLn $ pretty err
-    Right stmts -> putStrLn $ intercalate "\n\n" $ map pretty stmts
---  Right bytes -> do
---      h_out <- openFile "bin.svm" WriteMode
---      BIN.hPut h_out $ BIN.pack bytes
---      hClose h_out
+    Right bytes -> do
+        h_out <- openFile "bin.svm" WriteMode
+        BIN.hPut h_out $ BIN.pack bytes
+        hClose h_out
 
-go :: String -> SLC [StmtR]
-go = Parser.go >=> Typechecker.go >=> CPS.go >=> ClosureConversion.go >=> Hoist.go >=> Alloc.go >=> Regions.go
+go :: String -> SLC [Word8]
+go = Parser.go >=> Typechecker.go >=> CPS.go >=> ClosureConversion.go >=> Hoist.go >=> Alloc.go >=> Regions.go >=> Codegen.go

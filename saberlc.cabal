@@ -23,6 +23,7 @@ executable saberlc
         Hoist
         Alloc
         Regions
+        Codegen
 
     default-language: Haskell2010
     ghc-options:      -Wall

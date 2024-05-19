@@ -42,7 +42,7 @@ instance Pretty ExprParse where
 data Ident 
     = Local Int String
     | Global String 
-    deriving (Eq)
+    deriving (Eq, Show, Ord)
 
 instance Pretty Ident where
     pretty ident = case ident of
@@ -369,11 +369,11 @@ instance Pretty ExprR where
         InitR idNum s tpl i v scope -> "    let " ++ s ++ show idNum ++ " = " ++ pretty tpl ++ "[" ++ show i ++ "] <- " ++ pretty v ++ "\n" ++ pretty scope
 
 data StmtR
-    = FuncR Int String [(Int, String)] [(Int, String, TypeR)] ExprR
+    = FuncR Int String [(Int, Bool, String)] [(Int, String, TypeR)] ExprR
 
 instance Pretty StmtR where
     pretty stmt = case stmt of
-        FuncR idNum s context params body -> "fn " ++ s ++ show idNum ++ "[" ++ intercalate ", " (map (\(x,s2)->s2++show x) context) ++ "](" ++ intercalate ", " (map (\(x, s2, t) -> s2 ++ show x ++ ": " ++ pretty t) params) ++ ") {\n" ++ pretty body ++ "\n}"
+        FuncR idNum s context params body -> "fn " ++ s ++ show idNum ++ "[" ++ intercalate ", " (map (\(x,_,s2)->s2++show x) context) ++ "](" ++ intercalate ", " (map (\(x, s2, t) -> s2 ++ show x ++ ": " ++ pretty t) params) ++ ") {\n" ++ pretty body ++ "\n}"
 
 data Error
   = ParseError String
