@@ -5,7 +5,7 @@
 -}
 
 module Codegen (go) where
-import Header (SLC, StmtR (FuncR), TypeR (HandleTypeR, I32R, TypeVarR, FunctionTypeR, TupleTypeR, ExistentialR, ForallR, ForallRegionR), ExprR (AppR, HaltR, ProjR, UnpackR, MallocR, InitR), ValR (VarR, IntLitR, TypeAppR, PackR, TypeLambdaR, RegionLambdaR, RegionAppR), Ident (..))
+import Header (SLC, StmtR (FuncR), TypeR (HandleTypeR, I32R, TypeVarR, FunctionTypeR, TupleTypeR, ExistentialR, ForallR, ForallRegionR), ExprR (AppR, HaltR, ProjR, UnpackR, MallocR, InitR), ValR (VarR, IntLitR, TypeAppR, PackR, TypeLambdaR, RegionLambdaR, RegionAppR), Ident (..), getId)
 import Data.Binary (Word8, Word32)
 import Data.Map (Map, empty)
 import qualified Data.Map as Map
@@ -17,13 +17,13 @@ go :: [StmtR] -> SLC [Word8]
 go stmts =
   let (_, stmts_ops, t_ops, func_renames) =
         foldr
-          (\stmt (instr_pos, ops, tops, renames) ->
+          (\stmt (new_name, ops, tops, renames) ->
             let (idNum, t_ops_rev, stmt_ops_rev) = goStmt stmt in
-            (instr_pos + length stmt_ops_rev + 1, ops ++ reverse stmt_ops_rev, tops ++ reverse (LcedOp : t_ops_rev), Map.insert idNum instr_pos renames)
+            (new_name + 1, ops ++ reverse stmt_ops_rev, tops ++ reverse (LcedOp : t_ops_rev), Map.insert idNum new_name renames)
           )
-          (4, [], [], empty) -- 4 because of the function prepended in stmts_ops2
+          (1, [], [], empty) -- 1 because of the function prepended in stmts_ops2
           (reverse stmts) in
-  let fn_num = length stmts in
+  let fn_num = 1 + length stmts in
   let fn_num_ops = reverse [
         fromIntegral $ shiftR (fromIntegral fn_num :: Word32) 24,
         fromIntegral $ shiftR (fromIntegral fn_num :: Word32) 16,
@@ -31,9 +31,10 @@ go stmts =
         fromIntegral (fromIntegral fn_num :: Word32)]
     in
   let stmts_ops2 = [NewRgnOp 4096, GlobalFuncOp (-1), CallOp] ++ stmts_ops in
+  let t_ops2 = [FuncOp 0, LcedOp] ++ t_ops in
   return $
-    unsafePerformIO (writeFile "t.txt" (unlines $ show (length stmts) : map show t_ops ++ map show stmts_ops2) >> return id) $
-    (\bytes -> 0 : 0 : 0 : 0 : fn_num_ops ++ concatMap opToBytes t_ops ++ bytes) $
+    unsafePerformIO (writeFile "t.txt" (unlines $ show fn_num : map show t_ops2 ++ map show stmts_ops2) >> return id) $
+    (\bytes -> 0 : 0 : 0 : 0 : fn_num_ops ++ concatMap opToBytes t_ops2 ++ bytes) $
     foldr
       (\op ops ->
           case op of
@@ -74,10 +75,6 @@ diff (Pos i) (Pos j) = Pos (i - j)
 getLastOf :: Size a -> Pos a
 getLastOf (Size s) = Pos (s - 1)
 
-getId :: Ident -> Int
-getId (Local i _) = i
-getId (Global _) = undefined
-
 data Op
   = UniqueOp -- 0x00
   | HandleOp -- 0x01
@@ -100,13 +97,25 @@ data Op
   | PrintOp -- 0x12
   | LitOp Int -- 0x13
   | GlobalFuncOp Int -- 0x14
-  | HaltOp Int -- 0x15
+  | HaltOp -- 0x15
   | PackOp -- 0x16
   | SizeOp Int -- 0x17
   | NewRgnOp Int -- 0x18
   | FreeRgnOp -- 0x19
   | PtrOp -- 0x1A
   | DerefOp -- 0x1B
+  | ArrOp -- 0x1C,
+  | ArrMutOp -- 0x1D,
+  | ArrProjOp -- 0x1E,
+  | AddI32Op -- 0x1F,
+  | MulI32Op -- 0x20,
+  | DivI32Op -- 0x21,
+  | CallNZOp -- 0x22,
+  | DataOp Int -- 0x23,
+  | DataSecOp -- 0x24,
+  | U8Op -- 0x25,
+  | PrintNOp -- 0x26,
+  | U8LitOp Int -- 0x27
   deriving (Show)
 
 type ReverseOps = [Op]
@@ -144,7 +153,7 @@ opToBytes op = case op of
       fromIntegral $ shiftR (fromIntegral n :: Word32) 8,
       fromIntegral n
     ]
-  HaltOp n -> [0x15, fromIntegral n]
+  HaltOp -> [0x15]
   PackOp -> [0x16]
   SizeOp n -> 0x17 : reverse [
       fromIntegral $ shiftR (fromIntegral n :: Word32) 24,
@@ -161,6 +170,23 @@ opToBytes op = case op of
   FreeRgnOp -> [0x19]
   PtrOp -> [0x1A]
   DerefOp -> [0x1B]
+  ArrOp -> [0x1C]
+  ArrMutOp -> [0x1D]
+  ArrProjOp -> [0x1E]
+  AddI32Op -> [0x1F]
+  MulI32Op -> [0x20]
+  DivI32Op -> [0x21]
+  CallNZOp -> [0x22]
+  DataOp n -> 0x23 : reverse [
+      fromIntegral $ shiftR (fromIntegral n :: Word32) 24,
+      fromIntegral $ shiftR (fromIntegral n :: Word32) 16,
+      fromIntegral $ shiftR (fromIntegral n :: Word32) 8,
+      fromIntegral n
+    ]
+  DataSecOp -> [0x24]
+  U8Op -> [0x25]
+  PrintNOp -> [0x26]
+  U8LitOp n -> [0x27, fromIntegral n]
 
 goStmt :: StmtR -> (Int, ReverseOps, ReverseOps)
 goStmt (FuncR idNum _ ctx params body) =
@@ -175,25 +201,26 @@ goStmt (FuncR idNum _ ctx params body) =
           )
           (Size 0, [], Locals empty)
           (reverse ctx) in
-  let (_, params_ops_rev, rt_locals) =
+  let (_, _, params_ops_rev, rt_locals) =
         foldr
-          (\(x, _, t) (i, ops_rev, locals) ->
-            (dec i, goType ct_stack_size ct_locals t ++ ops_rev, insert x (getLastOf i) locals)
+          (\(x, _, t) (rtss, ctss, ops_rev, locals) ->
+            let new_rtss = inc rtss in
+            (new_rtss, inc ctss, goType ctss ct_locals t ++ ops_rev, insert x (getLastOf new_rtss) locals)
           )
-          (Size (length params + 1), [], Locals empty)
+          (Size 0, ct_stack_size, [], Locals empty)
           (reverse params) in
   let t_ops = replicate (length ctx) EndOp ++ FuncOp (length params) : params_ops_rev ++ tvar_ops_rev in
-  let body_ops = goExpr (inc $ Size $ length params) ct_stack_size rt_locals ct_locals body in
+  let body_ops = goExpr (Size $ length params) ct_stack_size rt_locals ct_locals body in
     (idNum, t_ops, body_ops)
 
 goExpr :: Size RT -> Size CT -> Locals RT -> Locals CT -> ExprR -> ReverseOps
 goExpr rt_stack_size ct_stack_size rt_locals ct_locals e = case e of
   AppR f args ->
-    let (rt_stack_size2, args_ops_rev) = foldr (\arg (i, ops_rev) -> (inc i, goVal i ct_stack_size rt_locals ct_locals arg ++ ops_rev)) (rt_stack_size, []) args in
+    let (rt_stack_size2, args_ops_rev) = foldr (\arg (i, ops_rev) -> (inc i, goVal i ct_stack_size rt_locals ct_locals arg ++ ops_rev)) (rt_stack_size, []) (reverse args) in
     let f_ops = goVal rt_stack_size2 ct_stack_size rt_locals ct_locals f in
     CallOp : f_ops ++ args_ops_rev
   HaltR v ->
-    HaltOp 0 : goVal rt_stack_size ct_stack_size rt_locals ct_locals v
+    HaltOp : U8LitOp 0 : PrintOp : ArrMutOp : LitOp 1 : U8LitOp 10 : ArrMutOp : LitOp 0 : AddI32Op : U8LitOp 48 : goVal (inc rt_stack_size) ct_stack_size rt_locals ct_locals v ++ [MallocOp, LitOp 2, ArrOp, U8Op, CTGetOp $ Pos $ sizeToInt ct_stack_size - 1, GetOp $ Pos $ sizeToInt rt_stack_size - 1]
   ProjR x _ _ tpl i scope ->
     let tpl_ops = goVal rt_stack_size ct_stack_size rt_locals ct_locals tpl in
     let rt_stack_size2 = inc rt_stack_size in
@@ -211,7 +238,7 @@ goExpr rt_stack_size ct_stack_size rt_locals ct_locals e = case e of
     let (_, ts_ops) = foldr (\t (i, ops_rev) -> (inc i, goType i ct_locals t ++ ops_rev)) (ct_stack_size2, []) ts in
     let rt_stack_size2 = inc rt_stack_size in -- push handle, pop handle, push tuple 
     let scope_ops = goExpr rt_stack_size2 ct_stack_size (insert x (getLastOf rt_stack_size2) rt_locals) ct_locals scope in -- ct_stack_size because the ct stack should be back where it started now
-    scope_ops ++ MallocOp : TupleOp (length ts) : ts_ops ++ r_ops ++ handle_ops
+    scope_ops ++ MallocOp : PtrOp : TupleOp (length ts) : ts_ops ++ r_ops ++ handle_ops
   InitR x _ tpl i v scope ->
     let tpl_ops = goVal rt_stack_size ct_stack_size rt_locals ct_locals tpl in
     let rt_stack_size2 = inc rt_stack_size in -- push
@@ -223,7 +250,7 @@ goExpr rt_stack_size ct_stack_size rt_locals ct_locals e = case e of
 
 goVal :: Size RT -> Size CT -> Locals RT -> Locals CT -> ValR -> ReverseOps
 goVal rt_stack_size ct_stack_size rt_locals ct_locals v = case v of
-  IntLitR i -> [LitOp i]
+  IntLitR i -> [U8LitOp i]
   VarR _t global x ->
     if global
       then
@@ -248,11 +275,21 @@ goVal rt_stack_size ct_stack_size rt_locals ct_locals v = case v of
     let t_ops_rev = goType (inc ct_stack_size) ct_locals t
     PackOp : t_ops_rev ++ exist_t_ops_rev ++ v_ops_rev
   TypeLambdaR {} -> undefined
-  RegionLambdaR {} -> undefined
+  RegionLambdaR params body -> do
+    let (ct_stack_size2, tvar_ops_rev, ct_locals2) =
+          foldr
+            (\(x, _) (i, ops_rev, locals) ->
+              let new_i = inc i in
+              (new_i, RgnOp : ops_rev, insert x (getLastOf new_i) locals)
+            )
+            (ct_stack_size, [], ct_locals)
+            (reverse params)
+    let body_ops_rev = goVal rt_stack_size ct_stack_size2 rt_locals ct_locals2 body
+    replicate (length params) EndOp ++ body_ops_rev ++ tvar_ops_rev
 
 goType :: Size CT -> Locals CT -> TypeR -> ReverseOps
 goType ct_stack_size ct_locals t = case t of
-  I32R -> [I32Op]
+  I32R -> [U8Op]
   TypeVarR x -> ctGet ct_stack_size ct_locals $ getId x
   FunctionTypeR params -> do
     let (_, param_ops_rev) =
@@ -262,7 +299,7 @@ goType ct_stack_size ct_locals t = case t of
                 (inc i, o ++ ops_rev)
             )
             (ct_stack_size, [])
-            params
+            (reverse params)
     FuncOp (length params) : param_ops_rev
   ForallR kind_ctx body -> do
     let (ct_locals2, ct_stack_size2, kind_ctx_ops) =
@@ -293,7 +330,7 @@ goType ct_stack_size ct_locals t = case t of
   TupleTypeR r ts ->
     let r_ops = ctGet ct_stack_size ct_locals $ getId r
      in let (_, ts_ops_rev) = foldr (\t2 (i, ops_rev) -> let o = goType i ct_locals t2 in (inc i, o ++ ops_rev)) (inc ct_stack_size, r_ops) ts
-         in TupleOp (length ts) : ts_ops_rev
+         in PtrOp : TupleOp (length ts) : ts_ops_rev
   ExistentialR x _ body ->
     let ct_stack_size2 = inc ct_stack_size
      in let body_ops_rev = goType ct_stack_size2 (insert x (getLastOf ct_stack_size2) ct_locals) body

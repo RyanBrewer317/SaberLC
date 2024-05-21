@@ -20,7 +20,7 @@ import System.IO
 import Data.Binary (Word8)
 
 main :: IO ()
-main = case run 0 $ go "(\\x: i32. x)(3)" of
+main = case run 0 $ go "(\\x: i32->i32. \\y: i32. x)(\\y: i32. y)(6)(7)" of
     Left err -> putStrLn $ pretty err
     Right bytes -> do
         h_out <- openFile "bin.svm" WriteMode
@@ -28,4 +28,12 @@ main = case run 0 $ go "(\\x: i32. x)(3)" of
         hClose h_out
 
 go :: String -> SLC [Word8]
-go = Parser.go >=> Typechecker.go >=> CPS.go >=> ClosureConversion.go >=> Hoist.go >=> Alloc.go >=> Regions.go >=> Codegen.go
+go = Parser.go 
+    >=> Typechecker.go 
+    >=> CPS.go
+    >=> ClosureConversion.go 
+    >=> Hoist.go 
+    >=> Alloc.go 
+    >=> Regions.go 
+    >=> Codegen.go
+

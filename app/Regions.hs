@@ -8,10 +8,12 @@
 module Regions (go) where
 
 import Header
-import Prelude hiding (id)
+import GHC.IO (unsafePerformIO)
 
 go :: [StmtA] -> SLC [StmtR]
-go = mapM goStmt
+go stmts = do
+  stmts2 <- mapM goStmt stmts
+  return $ unsafePerformIO (writeFile "t.gleam" (unlines $ map pretty stmts2) >> return id) stmts2
 
 goStmt :: StmtA -> SLC StmtR
 goStmt (FuncA x s tvars params body) = do
@@ -28,7 +30,7 @@ goExpr r rh e = case e of
   AppA f args -> do
     f2 <- goVal r rh f
     args2 <- mapM (goVal r rh) args
-    return $ AppR (RegionAppR f2 [r]) (VarR (HandleTypeR r) False rh : args2)
+    return $ AppR f2 (VarR (HandleTypeR r) False rh : args2)
   HaltA v -> HaltR <$> goVal r rh v
   ProjA x s t tpl i scope -> do
     tpl2 <- goVal r rh tpl
@@ -52,9 +54,12 @@ goExpr r rh e = case e of
 goVal :: Ident -> Ident -> ValA -> SLC ValR
 goVal r rh v = case v of
   IntLitA i -> return $ IntLitR i
-  VarA t global id -> do
+  VarA t global idNum -> do
     t2 <- goType r rh t
-    return $ VarR t2 global id
+    if global then
+      return $ RegionAppR (VarR t2 global idNum) [r]
+    else
+      return $ VarR t2 global idNum
   TypeLambdaA params body -> do
     body2 <- goVal r rh body
     return $ TypeLambdaR params body2
@@ -72,13 +77,11 @@ goVal r rh v = case v of
 goType :: Ident -> Ident -> TypeA -> SLC TypeR
 goType r rh t = case t of
   I32A -> return I32R
-  TypeVarA id -> return $ TypeVarR id
+  TypeVarA idNum -> return $ TypeVarR idNum
   ForallA params body -> ForallR params <$> goType r rh body
   FunctionTypeA params -> do
-    r2 <- fresh
-    let r2_ident = Local r2 "r"
     params2 <- mapM (goType r rh) params
-    return $ ForallRegionR [(r2, "r", False)] $ subR r r2_ident $ FunctionTypeR (HandleTypeR r2_ident : params2)
+    return $ FunctionTypeR (HandleTypeR r : params2)
   TupleTypeA ts -> do
     ts2 <- mapM (goType r rh) ts
     return $ TupleTypeR r ts2
@@ -86,15 +89,15 @@ goType r rh t = case t of
     body2 <- goType r rh body
     return $ ExistentialR x s body2
 
-subR :: Ident -> Ident -> TypeR -> TypeR
-subR old_r new_r t = case t of
-  I32R -> I32R
-  TypeVarR ident -> TypeVarR ident
-  ForallR params body -> ForallR params (subR old_r new_r body)
-  ForallRegionR params body -> ForallRegionR params (subR old_r new_r body)
-  FunctionTypeR params -> FunctionTypeR (map (subR old_r new_r) params)
-  TupleTypeR r ts -> 
-    let ts2 = map (subR old_r new_r) ts in
-    if r == old_r then TupleTypeR new_r ts2 else TupleTypeR r ts2
-  ExistentialR idNum s body -> ExistentialR idNum s (subR old_r new_r body)
-  HandleTypeR r -> if r == old_r then HandleTypeR new_r else HandleTypeR r
+-- subR :: Ident -> Ident -> TypeR -> TypeR
+-- subR old_r new_r t = case t of
+--   I32R -> I32R
+--   TypeVarR ident -> TypeVarR ident
+--   ForallR params body -> ForallR params (subR old_r new_r body)
+--   ForallRegionR params body -> ForallRegionR params (subR old_r new_r body)
+--   FunctionTypeR params -> FunctionTypeR (map (subR old_r new_r) params)
+--   TupleTypeR r ts -> 
+--     let ts2 = map (subR old_r new_r) ts in
+--     if r == old_r then TupleTypeR new_r ts2 else TupleTypeR r ts2
+--   ExistentialR idNum s body -> ExistentialR idNum s (subR old_r new_r body)
+--   HandleTypeR r -> if r == old_r then HandleTypeR new_r else HandleTypeR r
