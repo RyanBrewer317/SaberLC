@@ -107,14 +107,14 @@ data Op
   | ArrOp -- 0x1C,
   | ArrMutOp -- 0x1D,
   | ArrProjOp -- 0x1E,
-  | AddI32Op -- 0x1F,
-  | MulI32Op -- 0x20,
-  | DivI32Op -- 0x21,
+  | AddOp -- 0x1F,
+  | MulOp -- 0x20,
+  | DivOp -- 0x21,
   | CallNZOp -- 0x22,
   | DataOp Int -- 0x23,
   | DataSecOp -- 0x24,
   | U8Op -- 0x25,
-  | PrintNOp -- 0x26,
+  | CopyNOp -- 0x26,
   | U8LitOp Int -- 0x27
   deriving (Show)
 
@@ -173,9 +173,9 @@ opToBytes op = case op of
   ArrOp -> [0x1C]
   ArrMutOp -> [0x1D]
   ArrProjOp -> [0x1E]
-  AddI32Op -> [0x1F]
-  MulI32Op -> [0x20]
-  DivI32Op -> [0x21]
+  AddOp -> [0x1F]
+  MulOp -> [0x20]
+  DivOp -> [0x21]
   CallNZOp -> [0x22]
   DataOp n -> 0x23 : reverse [
       fromIntegral $ shiftR (fromIntegral n :: Word32) 24,
@@ -185,7 +185,7 @@ opToBytes op = case op of
     ]
   DataSecOp -> [0x24]
   U8Op -> [0x25]
-  PrintNOp -> [0x26]
+  CopyNOp -> [0x26]
   U8LitOp n -> [0x27, fromIntegral n]
 
 goStmt :: StmtR -> (Int, ReverseOps, ReverseOps)
@@ -220,7 +220,7 @@ goExpr rt_stack_size ct_stack_size rt_locals ct_locals e = case e of
     let f_ops = goVal rt_stack_size2 ct_stack_size rt_locals ct_locals f in
     CallOp : f_ops ++ args_ops_rev
   HaltR v ->
-    HaltOp : U8LitOp 0 : PrintOp : ArrMutOp : LitOp 1 : U8LitOp 10 : ArrMutOp : LitOp 0 : AddI32Op : U8LitOp 48 : goVal (inc rt_stack_size) ct_stack_size rt_locals ct_locals v ++ [MallocOp, LitOp 2, ArrOp, U8Op, CTGetOp $ Pos $ sizeToInt ct_stack_size - 1, GetOp $ Pos $ sizeToInt rt_stack_size - 1]
+    HaltOp : U8LitOp 0 : PrintOp : ArrMutOp : LitOp 1 : U8LitOp 10 : ArrMutOp : LitOp 0 : AddOp : U8LitOp 48 : goVal (inc rt_stack_size) ct_stack_size rt_locals ct_locals v ++ [MallocOp, LitOp 2, ArrOp, U8Op, CTGetOp $ Pos $ sizeToInt ct_stack_size - 1, GetOp $ Pos $ sizeToInt rt_stack_size - 1]
   ProjR x _ _ tpl i scope ->
     let tpl_ops = goVal rt_stack_size ct_stack_size rt_locals ct_locals tpl in
     let rt_stack_size2 = inc rt_stack_size in
