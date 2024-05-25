@@ -6,7 +6,7 @@
 
 module Codegen (go) where
 import Header (SLC, StmtR (FuncR), TypeR (HandleTypeR, I32R, TypeVarR, FunctionTypeR, TupleTypeR, ExistentialR, ForallR, ForallRegionR), ExprR (AppR, HaltR, ProjR, UnpackR, MallocR, InitR), ValR (VarR, IntLitR, TypeAppR, PackR, TypeLambdaR, RegionLambdaR, RegionAppR), Ident (..), getId)
-import Data.Binary (Word8, Word32)
+import Data.Binary (Word8, Word32, Word64)
 import Data.Map (Map, empty)
 import qualified Data.Map as Map
 import Data.Bits (shiftR)
@@ -21,9 +21,9 @@ go stmts =
             let (idNum, t_ops_rev, stmt_ops_rev) = goStmt stmt in
             (new_name + 1, ops ++ reverse stmt_ops_rev, tops ++ reverse (LcedOp : t_ops_rev), Map.insert idNum new_name renames)
           )
-          (1, [], [], empty) -- 1 because of the function prepended in stmts_ops2
+          (2, [], [], empty) -- 2 because of the functions prepended in stmts_ops2 and t_ops2 below
           (reverse stmts) in
-  let fn_num = 1 + length stmts in
+  let fn_num = 2 + length stmts in
   let fn_num_ops = reverse [
         fromIntegral $ shiftR (fromIntegral fn_num :: Word32) 24,
         fromIntegral $ shiftR (fromIntegral fn_num :: Word32) 16,
@@ -31,7 +31,7 @@ go stmts =
         fromIntegral (fromIntegral fn_num :: Word32)]
     in
   let stmts_ops2 = [NewRgnOp 4096, GlobalFuncOp (-1), CallOp] ++ stmts_ops in
-  let t_ops2 = [FuncOp 0, LcedOp] ++ t_ops in
+  let t_ops2 = [FuncOp 0, LcedOp, RgnOp, I32Op, CTGetOp (Pos 1), HandleOp, FuncOp 2, EndOp, ImportOp 7956016043790589812 8389209342666080256] ++ t_ops in
   return $
     unsafePerformIO (writeFile "t.txt" (unlines $ show fn_num : map show t_ops2 ++ map show stmts_ops2) >> return id) $
     (\bytes -> 0 : 0 : 0 : 0 : fn_num_ops ++ concatMap opToBytes t_ops2 ++ bytes) $
@@ -41,7 +41,7 @@ go stmts =
             GlobalFuncOp idNum ->
               case Map.lookup idNum func_renames of
                 Just new_id -> opToBytes (GlobalFuncOp new_id) ++ ops
-                Nothing -> undefined
+                Nothing -> opToBytes (GlobalFuncOp idNum) ++ ops
             _ -> opToBytes op ++ ops
       )
       []
@@ -116,6 +116,11 @@ data Op
   | U8Op -- 0x25,
   | CopyNOp -- 0x26,
   | U8LitOp Int -- 0x27
+  | U8ToI32Op -- 0x28
+  | ImportOp Word64 Word64 -- 0x29,
+  | ExportOp Word64 Word64 -- 0x2A,
+  | ModuloOp -- 0x2B,
+  | I32ToU8Op -- 0x2C,
   deriving (Show)
 
 type ReverseOps = [Op]
@@ -187,6 +192,45 @@ opToBytes op = case op of
   U8Op -> [0x25]
   CopyNOp -> [0x26]
   U8LitOp n -> [0x27, fromIntegral n]
+  U8ToI32Op -> [0x28]
+  ImportOp a b -> 0x29 : reverse [
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 56,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 48,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 40,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 32,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 24,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 16,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 8,
+      fromIntegral a,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 56,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 48,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 40,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 32,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 24,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 16,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 8,
+      fromIntegral b
+    ]
+  ExportOp a b -> 0x2A : reverse [
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 56,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 48,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 40,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 32,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 24,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 16,
+      fromIntegral $ shiftR (fromIntegral a :: Word64) 8,
+      fromIntegral a,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 56,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 48,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 40,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 32,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 24,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 16,
+      fromIntegral $ shiftR (fromIntegral b :: Word64) 8,
+      fromIntegral b
+    ]
+  ModuloOp -> [0x2B]
+  I32ToU8Op -> [0x2C]
 
 goStmt :: StmtR -> (Int, ReverseOps, ReverseOps)
 goStmt (FuncR idNum _ ctx params body) =
@@ -220,7 +264,7 @@ goExpr rt_stack_size ct_stack_size rt_locals ct_locals e = case e of
     let f_ops = goVal rt_stack_size2 ct_stack_size rt_locals ct_locals f in
     CallOp : f_ops ++ args_ops_rev
   HaltR v ->
-    HaltOp : U8LitOp 0 : PrintOp : ArrMutOp : LitOp 1 : U8LitOp 10 : ArrMutOp : LitOp 0 : AddOp : U8LitOp 48 : goVal (inc rt_stack_size) ct_stack_size rt_locals ct_locals v ++ [MallocOp, LitOp 2, ArrOp, U8Op, CTGetOp $ Pos $ sizeToInt ct_stack_size - 1, GetOp $ Pos $ sizeToInt rt_stack_size - 1]
+    CallOp : GlobalFuncOp 1 : CTGetOp (Pos $ sizeToInt ct_stack_size - 1) : GetOp (Pos $ sizeToInt (inc (inc rt_stack_size)) - 1) : GetOp (Pos 1) : goVal (inc rt_stack_size) ct_stack_size rt_locals ct_locals v
   ProjR x _ _ tpl i scope ->
     let tpl_ops = goVal rt_stack_size ct_stack_size rt_locals ct_locals tpl in
     let rt_stack_size2 = inc rt_stack_size in
@@ -250,7 +294,7 @@ goExpr rt_stack_size ct_stack_size rt_locals ct_locals e = case e of
 
 goVal :: Size RT -> Size CT -> Locals RT -> Locals CT -> ValR -> ReverseOps
 goVal rt_stack_size ct_stack_size rt_locals ct_locals v = case v of
-  IntLitR i -> [U8LitOp i]
+  IntLitR i -> [LitOp i]
   VarR _t global x ->
     if global
       then
@@ -289,7 +333,7 @@ goVal rt_stack_size ct_stack_size rt_locals ct_locals v = case v of
 
 goType :: Size CT -> Locals CT -> TypeR -> ReverseOps
 goType ct_stack_size ct_locals t = case t of
-  I32R -> [U8Op]
+  I32R -> [I32Op]
   TypeVarR x -> ctGet ct_stack_size ct_locals $ getId x
   FunctionTypeR params -> do
     let (_, param_ops_rev) =
